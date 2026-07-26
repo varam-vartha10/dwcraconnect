@@ -1,0 +1,286 @@
+{
+  "@@locale": "en",
+  "appName": "DWCRA Connect",
+  "tagline": "Empowered Women, Stronger Communities",
+
+  "login": "Login",
+  "register": "Register",
+  "mobileNumber": "Mobile Number",
+  "password": "Password",
+  "forgotPassword": "Forgot Password?",
+  "loginTitle": "Login to DWCRA Connect",
+  "enterPhoneHint": "Enter 10 digit number",
+  "enterPasswordHint": "Enter your password",
+  "dontHaveAccount": "Don't have an account? ",
+  "invalidMobile": "Please enter a valid 10-digit mobile number",
+  "invalidPassword": "Password must be at least 6 characters",
+  "invalidCredentials": "Invalid phone number or password",
+  "loginSuccess": "Login Successful",
+
+  "fullName": "Full Name",
+  "aadhaarNumber": "Aadhaar Number",
+  "village": "Village",
+  "shgGroup": "SHG Group",
+  "confirmPassword": "Confirm Password",
+  "sendOtp": "Send OTP",
+  "next": "Next",
+  "previous": "Previous",
+  "stepPersonal": "Personal Details",
+  "stepGroup": "Group Details",
+  "stepSecurity": "Security",
+  "invalidAadhaar": "Please enter a valid 12-digit Aadhaar number",
+  "passwordsDoNotMatch": "Passwords do not match",
+  "required": "Required",
+
+  "otpVerification": "OTP Verification",
+  "otpSentTo": "Enter the OTP sent to",
+  "verifyOtp": "Verify OTP",
+  "resendOtp": "Resend OTP",
+  "didNotReceiveOtp": "Didn't receive the OTP?",
+  "otpVerifiedSuccess": "OTP Verified Successfully",
+  "invalidOtp": "Please enter a valid 6-digit OTP",
+
+  "forgotPasswordTitle": "Forgot Password",
+  "enterMobileToReset": "Enter your mobile number to reset password",
+  "resetPassword": "Reset Password",
+  "setNewPassword": "Set New Password",
+  "newPassword": "New Password",
+  "passwordUpdated": "Password Updated Successfully",
+  "backToLogin": "Back to Login",
+
+  "dashboard": "Dashboard",
+  "home": "Home",
+  "alerts": "Alerts",
+  "profile": "Profile",
+  "welcome": "Welcome",
+  "namaste": "Namaste",
+  "activeLoans": "Active Loans",
+  "nextEmi": "Next EMI",
+  "subsidy": "Subsidy",
+  "lastPayment": "Last Payment",
+  "recentActivity": "Recent Activity",
+  "viewAll": "View All",
+  "noRecentActivity": "No recent activities found.",
+
+  "loanDetails": "Loan Details",
+  "totalLoanAmount": "Total Loan Amount",
+  "paidAmount": "Paid Amount",
+  "remainingAmount": "Remaining Amount",
+  "loanStatus": "Loan Status",
+  "loanType": "Loan Type",
+  "interestRate": "Interest Rate",
+  "active": "Active",
+  "repaid": "Repaid",
+  "back": "Back",
+  "backToDashboard": "Back to Dashboard",
+
+  "emiDetails": "EMI Details",
+  "emiAmount": "EMI Amount",
+  "dueDate": "Due Date",
+  "remainingEmiCount": "Remaining EMI Count",
+  "nextEmiDate": "Next EMI Date",
+  "repaymentSchedule": "Repayment Schedule",
+  "remainingEmis": "Remaining EMIs",
+  "timelyRepaymentTip": "Timely repayment helps in getting higher credit limits for your SHG group.",
+
+  "transactionHistory": "Transaction History",
+  "searchTransactions": "Search transactions...",
+  "filter": "Filter",
+  "exportPdf": "Export PDF",
+  "date": "Date",
+  "description": "Description",
+  "amount": "Amount",
+  "all": "All",
+  "credit": "Credit",
+  "debit": "Debit",
+
+  "subsidyDetails": "Subsidy Details",
+  "schemeName": "Scheme Name",
+  "receivedDate": "Received Date",
+  "status": "Status",
+  "received": "Received",
+  "pending": "Pending",
+  "emiStatus": "EMI Status",
+  "activeStatus": "Active Status",
+  "repaidPercent": "{percent}% Repaid",
+  "@repaidPercent": {
+    "placeholders": {
+      "percent": {
+        "type": "int"
+      }
+    }
+  },
+  "receivedOn": "Received on {date}",
+  "@receivedOn": {
+    "placeholders": {
+      "date": {
+        "type": "String"
+      }
+    }
+  },
+  "subsidyAmount": "Subsidy Amount",
+
+  "notifications": "Notifications",
+  "markAllRead": "Mark all read",
+  "noNotifications": "No notifications yet",
+  "emiReminder": "EMI Reminder",
+  "govScheme": "Govt Scheme",
+  "loanUpdate": "Loan Update",
+
+  "settings": "Settings",
+  "personalInfo": "Personal Information",
+  "groupInfo": "Group Information",
+  "notificationSettings": "Notification Settings",
+  "securitySettings": "Security Settings",
+  "language": "Language",
+  "changeLanguage": "Change Language",
+  "darkMode": "Dark Mode",
+  "backupRestore": "Backup & Restore",
+  "appVersion": "App Version",
+  "aadhaarMasked": "Aadhaar (Masked)",
+  "logout": "Logout",
+  "logoutConfirm": "Are you sure you want to logout?",
+  "yes": "Yes",
+  "no": "No",
+
+  "leaderDashboard": "Leader Dashboard",
+  "totalMembers": "Total Members",
+  "pendingEmi": "Pending EMI",
+  "subsidyRecords": "Subsidy Records",
+  "groupLedger": "Group Ledger",
+  "reports": "Reports",
+  "members": "Members",
+  "member": "Member",
+  "leader": "Leader",
+  "groupAnalytics": "Group Analytics",
+  "savings": "Savings",
+  "repayment": "Repayment",
+  "creditScore": "Credit Score",
+  "communityPulse": "Community Pulse",
+  "monthlyThriftCollected": "Monthly thrift collected",
+  "repaymentDiscipline": "Repayment discipline",
+  "trainingCompletion": "Training completion",
+  "welcomeLeader": "Welcome Leader,",
+
+  "memberList": "Member List",
+  "searchMembers": "Search members...",
+  "memberId": "Member ID",
+  "name": "Name",
+  "memberDetails": "Member Details",
+  "memberDetailsTitle": "Member Details",
+  "close": "Close",
+
+  "totalLoanDistributed": "Total Loan Distributed",
+  "totalLoanRepaid": "Total Loan Repaid",
+  "outstandingAmount": "Outstanding Amount",
+  "groupRepaymentProgress": "Group Repayment Progress",
+  "monthlyCollectionTrend": "Monthly Collection Trend",
+
+  "selectReportType": "Select Report Type",
+  "monthlyCollection": "Monthly Collection",
+  "recovery": "Recovery",
+  "exportExcel": "Export Excel",
+  "exportReport": "Export {report}",
+  "@exportReport": {
+    "placeholders": {
+      "report": {
+        "type": "String"
+      }
+    }
+  },
+  "pdfExportSuccess": "PDF Exported Successfully",
+  "excelExportSuccess": "Excel Exported Successfully",
+
+  "addTransaction": "Add Transaction",
+  "category": "Category",
+  "other": "Other",
+  "enterAmountHint": "Enter amount",
+  "save": "Save",
+  "success": "Success",
+  "loanRepayment": "Loan Repayment",
+
+  "markAttendance": "Mark Attendance",
+  "meetingAttendance": "Meeting Attendance",
+  "groupMeeting": "Group Meeting",
+  "location": "Location",
+  "shgCenter": "SHG Center",
+  "groupMeetingAt": "{meeting} - {date}",
+  "@groupMeetingAt": {
+    "placeholders": {
+      "meeting": {
+        "type": "String"
+      },
+      "date": {
+        "type": "String"
+      }
+    }
+  },
+
+  "applyLoan": "Apply for Loan",
+  "enterRequiredAmount": "Enter Required Amount",
+  "purposeOfLoan": "Purpose of Loan",
+  "submitApplication": "Submit Application",
+  "applicationSubmitted": "Application Submitted Successfully",
+  "businessGrowth": "Business Growth",
+  "emergency": "Emergency",
+  "education": "Education",
+
+  "trainingHub": "Training Hub",
+  "finLitTitle": "Financial Literacy 101",
+  "finLitDesc": "Learn how to manage your SHG savings efficiently.",
+  "govSchemeTitle": "Government Schemes 2026",
+  "govSchemeDesc": "Explore the latest benefits for women entrepreneurs.",
+  "digiMarketTitle": "Digital Marketing for SHGs",
+  "digiMarketDesc": "How to sell your products online.",
+  "learnToGrow": "Learn to Grow",
+  "newTrainingVideos": "New Training Videos Available",
+
+  "chooseLanguage": "Choose Your Language",
+  "selectLanguageToContinue": "Select a language to continue",
+  "english": "English",
+  "telugu": "Telugu",
+  "continueBtn": "Continue",
+  "languageChanged": "Language Changed Successfully",
+
+  "june": "June",
+  "may": "May",
+  "april": "April",
+  "march": "March",
+  "loanBalance": "Loan Balance",
+  "savingsProgress": "Savings Progress",
+  "communityHub": "Community Hub",
+  "groupMeetingTomorrow": "Group Meeting Tomorrow",
+  "groupMeetingTomorrowDesc": "10:30 AM at Village Center",
+  "support": "Support",
+  "awards": "Awards",
+  "amountSaved": "₹{amount} Saved",
+  "@amountSaved": {
+    "placeholders": {
+      "amount": {
+        "type": "String"
+      }
+    }
+  },
+  "president": "President",
+  "secretary": "Secretary",
+  "preparingWorkspace": "Preparing SHG workspace",
+  "sendRemindersToAll": "Send Reminders to All",
+  "overdue": "OVERDUE",
+  "totalPending": "Total Pending",
+  "newNotifications": "{count} New",
+  "@newNotifications": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "loans": "Loans",
+  "searchSubsidies": "Search subsidies...",
+  "loanAmount": "Loan Amount",
+  "remaining": "Remaining",
+  "shgBankLinkage": "SHG Bank Linkage",
+  "yearly": "Yearly",
+  "cancel": "Cancel",
+  "changePassword": "Change Password"
+}

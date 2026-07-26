@@ -1,0 +1,61 @@
+name: dwcra_connect
+description: "DWCRA Connect: Women Self Help Group (SHG) Financial Management App."
+publish_to: 'none'
+
+version: 1.0.0+1
+
+environment:
+  sdk: ^3.12.2
+
+dependencies:
+  flutter:
+    sdk: flutter
+  flutter_localizations:
+    sdk: flutter
+  
+  # State Management
+  flutter_riverpod: ^2.5.1
+  
+  # Routing
+  go_router: ^14.0.0
+  
+  # Local Database
+  hive: ^2.2.3
+  hive_flutter: ^1.1.0
+  
+  # Secure Storage
+  flutter_secure_storage: ^9.2.2
+  shared_preferences: ^2.2.3
+  
+  # Localization & Formatting
+  intl: ^0.20.2
+  
+  # Icons & UI
+  cupertino_icons: ^1.0.8
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+  flutter_launcher_icons: ^0.13.1
+  image: ^4.9.1
+  
+  # Code Generation
+  build_runner: ^2.4.9
+  hive_generator: ^2.0.1
+
+flutter:
+  uses-material-design: true
+  generate: true
+
+  assets:
+    - assets/images/
+
+flutter_launcher_icons:
+  android: "launcher_icon"
+  ios: false
+  # Generated from assets/logo.png so Android masks do not crop the logo.
+  image_path: "assets/icons/launcher_icon_source.png"
+  min_sdk_android: 21
+  adaptive_icon_background: "#6A1B9A"
+  adaptive_icon_foreground: "assets/icons/launcher_icon_source.png"
