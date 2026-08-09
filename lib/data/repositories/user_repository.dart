@@ -1,98 +1,55 @@
+
 import '../../domain/entities/user_entity.dart';
+import '../../core/network/api_service.dart';
 
 class UserRepository {
-  static const String dummyPassword = "123456";
+  static Future<UserEntity> login(
+    String phoneNumber,
+    String password,
+  ) async {
+    final response = await ApiService.post(
+      '/auth/login',
+      {
+        'phoneNumber': phoneNumber,
+        'password': password,
+      },
+    );
 
-  static final List<UserEntity> users = [
-    const UserEntity(
-      id: 'SHG-001',
-      name: 'Savitri Devi',
-      phoneNumber: '9000000001',
-      password: dummyPassword,
-      role: UserRole.leader,
-      position: UserPosition.president,
-    ),
-    const UserEntity(
-      id: 'SHG-002',
-      name: 'Lakshmi Devi',
-      phoneNumber: '9000000002',
-      password: dummyPassword,
-      role: UserRole.leader,
-      position: UserPosition.secretary,
-    ),
-    const UserEntity(
-      id: 'SHG-003',
-      name: 'Anasuya',
-      phoneNumber: '9000000003',
-      password: dummyPassword,
-      role: UserRole.member,
-      position: UserPosition.member,
-    ),
-    const UserEntity(
-      id: 'SHG-004',
-      name: 'Bhavani',
-      phoneNumber: '9000000004',
-      password: dummyPassword,
-      role: UserRole.member,
-      position: UserPosition.member,
-    ),
-    const UserEntity(
-      id: 'SHG-005',
-      name: 'Rajeshwari',
-      phoneNumber: '9000000005',
-      password: dummyPassword,
-      role: UserRole.member,
-      position: UserPosition.member,
-    ),
-    const UserEntity(
-      id: 'SHG-006',
-      name: 'Padma',
-      phoneNumber: '9000000006',
-      password: dummyPassword,
-      role: UserRole.member,
-      position: UserPosition.member,
-    ),
-    const UserEntity(
-      id: 'SHG-007',
-      name: 'Jyothi',
-      phoneNumber: '9000000007',
-      password: dummyPassword,
-      role: UserRole.member,
-      position: UserPosition.member,
-    ),
-    const UserEntity(
-      id: 'SHG-008',
-      name: 'Sujatha',
-      phoneNumber: '9000000008',
-      password: dummyPassword,
-      role: UserRole.member,
-      position: UserPosition.member,
-    ),
-    const UserEntity(
-      id: 'SHG-009',
-      name: 'Lalitha',
-      phoneNumber: '9000000009',
-      password: dummyPassword,
-      role: UserRole.member,
-      position: UserPosition.member,
-    ),
-    const UserEntity(
-      id: 'SHG-010',
-      name: 'Kavitha',
-      phoneNumber: '9000000010',
-      password: dummyPassword,
-      role: UserRole.member,
-      position: UserPosition.member,
-    ),
-  ];
+    if (response['success'] != true) {
+      throw Exception(response['message'] ?? 'Login failed');
+    }
 
-  static UserEntity? findUser(String phone, String password) {
-    try {
-      return users.firstWhere(
-        (u) => u.phoneNumber == phone && u.password == password,
-      );
-    } catch (_) {
-      return null;
+    final userData = Map<String, dynamic>.from(response['user']);
+
+    return UserEntity(
+      id: userData['userId'] ?? '',
+      groupId: userData['groupId'] ?? '',
+      name: userData['name'] ?? '',
+      phoneNumber: userData['phoneNumber'] ?? '',
+      role: _parseRole(userData['role']),
+      position: _parsePosition(userData['position']),
+    );
+  }
+
+  static UserRole _parseRole(String? role) {
+    switch (role) {
+      case 'leader':
+        return UserRole.leader;
+      case 'member':
+        return UserRole.member;
+      default:
+        return UserRole.unknown;
+    }
+  }
+
+  static UserPosition _parsePosition(String? position) {
+    switch (position) {
+      case 'president':
+        return UserPosition.president;
+      case 'secretary':
+        return UserPosition.secretary;
+      default:
+        return UserPosition.member;
     }
   }
 }

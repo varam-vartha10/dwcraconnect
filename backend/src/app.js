@@ -12,11 +12,13 @@ const userRoutes = require("./routes/userRoutes");
 const groupRoutes = require("./routes/groupRoutes");
 const loanRoutes = require("./routes/loanRoutes");
 const emiRoutes = require("./routes/emiRoutes");
+const authRoutes = require("./routes/authRoutes");
 
 app.use("/api/loans", loanRoutes);
 app.use("/api/users", userRoutes);
 app.use("/api/groups", groupRoutes);
 app.use("/api/emis", emiRoutes);
+app.use("/api/auth", authRoutes);
 
 app.get("/api/health", (req, res) => {
   res.status(200).json({
