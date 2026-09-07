@@ -1,4 +1,5 @@
 const User = require("../models/User");
+const Group = require("../models/Group");
 const bcrypt = require("bcryptjs");
 
 // Get all users
@@ -46,7 +47,7 @@ const getUsersByGroup = async (req, res) => {
 // Create user
 const createUser = async (req, res) => {
   try {
-    const {
+    let {
       userId,
       groupId,
       name,
@@ -58,23 +59,39 @@ const createUser = async (req, res) => {
       village,
     } = req.body;
 
-    if (
-      !userId ||
-      !groupId ||
-      !name ||
-      !phoneNumber ||
-      !password ||
-      !role ||
-      !position
-    ) {
+    // 1. Validation
+    if (!userId || !groupId || !name || !phoneNumber || !password || !role || !position) {
       return res.status(400).json({
         success: false,
         message: "Required fields are missing",
       });
     }
 
+    // 2. Normalize and check combination
+    userId = userId.trim();
+    phoneNumber = String(phoneNumber).trim();
+
+    if (role === "member" && position !== "member") {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid position for 'member' role. Must be 'member'.",
+      });
+    }
+
+    if (role === "leader" && !["president", "secretary"].includes(position)) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid position for 'leader' role. Must be 'president' or 'secretary'.",
+      });
+    }
+
+    // 3. Check for duplicates (Checking both phoneNumber and legacy mobile field)
     const existingUser = await User.findOne({
-      $or: [{ userId }, { phoneNumber }],
+      $or: [
+        { userId: userId },
+        { phoneNumber: phoneNumber },
+        { mobile: phoneNumber }
+      ],
     });
 
     if (existingUser) {
@@ -83,21 +100,38 @@ const createUser = async (req, res) => {
         message: "User ID or phone number already exists",
       });
     }
-    const hashedPassword = await bcrypt.hash(password, 12);
+
+    // 4. Group business rule: max 10 members
+    const groupMemberCount = await User.countDocuments({ groupId, isActive: true });
+    if (groupMemberCount >= 10) {
+      return res.status(400).json({
+        success: false,
+        message: "Group already has the maximum of 10 members",
+      });
+    }
+
+    // 5. Hash password
+    const salt = await bcrypt.genSalt(12);
+    const hashedPassword = await bcrypt.hash(password, salt);
+
+    // 6. Create user
     const user = await User.create({
-    userId,
-    groupId,
-    name,
-    phoneNumber,
-    password: hashedPassword,
-    role,
-    position,
-    aadhaar,
-    village,
+      userId,
+      groupId,
+      name,
+      phoneNumber,
+      password: hashedPassword,
+      role,
+      position,
+      aadhaar,
+      village,
+      isActive: true
     });
 
     const safeUser = user.toObject();
     delete safeUser.password;
+
+    console.log(`[User] New user created: ${user.userId}`);
 
     res.status(201).json({
       success: true,
@@ -105,40 +139,29 @@ const createUser = async (req, res) => {
       user: safeUser,
     });
   } catch (error) {
-    console.error("Create user error:", error);
-
+    console.error("[User] Create user error:", error);
     res.status(500).json({
       success: false,
-      message: "Failed to create user",
+      message: "An internal server error occurred while creating user",
     });
   }
 };
 
-
-
-
 const migratePasswords = async (req, res) => {
   try {
     const users = await User.find();
-
     let updated = 0;
     let skipped = 0;
 
     for (const user of users) {
-      if (
-        typeof user.password === "string" &&
-        user.password.startsWith("$2")
-      ) {
-        console.log(`${user.userId}: already hashed`);
+      if (typeof user.password === "string" && (user.password.startsWith("$2a$") || user.password.startsWith("$2b$"))) {
         skipped++;
         continue;
       }
 
-      user.password = await bcrypt.hash(user.password, 12);
-
+      const salt = await bcrypt.genSalt(12);
+      user.password = await bcrypt.hash(user.password, salt);
       await user.save();
-
-      console.log(`${user.userId}: password hashed`);
       updated++;
     }
 
@@ -151,7 +174,6 @@ const migratePasswords = async (req, res) => {
     });
   } catch (error) {
     console.error("Password migration error:", error);
-
     res.status(500).json({
       success: false,
       message: "Password migration failed",

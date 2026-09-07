@@ -10,11 +10,6 @@ const connectDatabase = require("./src/config/database");
 
 const PORT = process.env.PORT || 5000;
 
-// Loan routes
-const loanRoutes = require("./src/routes/loanRoutes");
-
-app.use("/api/loans", loanRoutes);
-
 const startServer = async () => {
   try {
     await connectDatabase();

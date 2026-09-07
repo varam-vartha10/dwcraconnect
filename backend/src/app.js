@@ -13,12 +13,18 @@ const groupRoutes = require("./routes/groupRoutes");
 const loanRoutes = require("./routes/loanRoutes");
 const emiRoutes = require("./routes/emiRoutes");
 const authRoutes = require("./routes/authRoutes");
+const transactionRoutes = require("./routes/transactionRoutes");
+const subsidyRoutes = require("./routes/subsidyRoutes");
+const notificationRoutes = require("./routes/notificationRoutes");
 
-app.use("/api/loans", loanRoutes);
+app.use("/api/auth", authRoutes);
 app.use("/api/users", userRoutes);
 app.use("/api/groups", groupRoutes);
+app.use("/api/loans", loanRoutes);
 app.use("/api/emis", emiRoutes);
-app.use("/api/auth", authRoutes);
+app.use("/api/transactions", transactionRoutes);
+app.use("/api/subsidies", subsidyRoutes);
+app.use("/api/notifications", notificationRoutes);
 
 app.get("/api/health", (req, res) => {
   res.status(200).json({

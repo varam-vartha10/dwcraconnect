@@ -1,5 +1,5 @@
 const express = require("express");
-
+const { protect } = require("../middleware/auth");
 const {
   getLoans,
   createLoan,
@@ -7,8 +7,7 @@ const {
 
 const router = express.Router();
 
-router.get("/", getLoans);
-
-router.post("/", createLoan);
+router.get("/", protect, getLoans);
+router.post("/", protect, createLoan);
 
 module.exports = router;
