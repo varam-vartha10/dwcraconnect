@@ -15,15 +15,21 @@ class DashboardSummary {
   });
 }
 
-final dashboardSummaryProvider = Provider<DashboardSummary>((ref) {
+final dashboardSummaryProvider = FutureProvider<DashboardSummary>((ref) async {
   final loans = ref.watch(loansProvider);
   final subsidies = ref.watch(subsidiesProvider);
   final members = ref.watch(membersProvider);
-  final emis = ref.watch(emisProvider);
+  
+  // Wait for EMIs from the backend
+  final emis = await ref.watch(emisProvider.future);
 
   final totalLoan = loans.fold(0.0, (sum, item) => sum + item.remainingAmount);
   final totalSubsidy = subsidies.fold(0.0, (sum, item) => sum + item.amount);
-  final pendingEmi = emis.fold(0.0, (sum, item) => sum + item.amount);
+  
+  // Calculate only pending/overdue EMIs
+  final pendingEmi = emis
+      .where((e) => e.status == 'pending' || e.status == 'overdue')
+      .fold(0.0, (sum, item) => sum + item.amount);
 
   return DashboardSummary(
     totalLoanOutstanding: totalLoan,

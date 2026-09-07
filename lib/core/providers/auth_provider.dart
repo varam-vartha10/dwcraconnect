@@ -58,7 +58,8 @@ class AuthNotifier extends StateNotifier<AuthState> {
   }
 }
 
-  Future<UserRole> login(
+
+Future<UserRole> login(
   String phoneNumber,
   String password,
 ) async {
@@ -77,7 +78,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
 
     await prefs.setString(
       _userPhoneKey,
-      phoneNumber,
+      user.phoneNumber,
     );
 
     state = AuthState(
@@ -86,7 +87,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
       isInitialized: true,
     );
 
-    // Reset navigation index after login
+    // Reset navigation after login
     if (user.role == UserRole.leader) {
       _ref
           .read(leaderBottomNavIndexProvider.notifier)
@@ -101,10 +102,9 @@ class AuthNotifier extends StateNotifier<AuthState> {
   } catch (error) {
     state = state.copyWith(
       isLoading: false,
-      errorMessage: error.toString().replaceFirst(
-        'Exception: ',
-        '',
-      ),
+      errorMessage: error
+          .toString()
+          .replaceFirst('Exception: ', ''),
     );
 
     return UserRole.unknown;

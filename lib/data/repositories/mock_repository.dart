@@ -174,10 +174,14 @@ class MockRepository {
 
   static final List<EmiEntity> emis = members.map((m) => EmiEntity(
     id: 'E-${m.id}',
+    loanId: 'L-${m.id}',
+    memberId: m.id,
     memberName: m.name,
+    groupId: 'GRP001',
+    installmentNumber: 1,
     amount: m.emiAmount,
     dueDate: DateTime(2026, 7, 5),
-    isOverdue: false,
+    status: 'pending',
   )).toList();
 
   static final List<SubsidyEntity> subsidies = members.map((m) => SubsidyEntity(

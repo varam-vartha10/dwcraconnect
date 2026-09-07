@@ -75,73 +75,77 @@ class _LeaderHome extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final l10n = AppLocalizations.of(context)!;
-    final summary = ref.watch(dashboardSummaryProvider);
+    final summaryAsync = ref.watch(dashboardSummaryProvider);
 
-    return SingleChildScrollView(
-      child: Column(
-        children: [
-          _buildHeader(context, name, l10n),
-          Padding(
-            padding: const EdgeInsets.all(16.0),
-            child: GridView.count(
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              crossAxisCount: 2,
-              crossAxisSpacing: 16,
-              mainAxisSpacing: 16,
-              children: [
-                _buildActionCard(
-                  l10n.totalMembers, 
-                  '${summary.totalMembers}', 
-                  Icons.group_rounded, 
-                  AppColors.shgTeal,
-                  onTap: () => ref.read(leaderBottomNavIndexProvider.notifier).state = 1,
-                ),
-                _buildActionCard(
-                  l10n.activeLoans, 
-                  '₹${summary.totalLoanOutstanding.toInt()}', 
-                  Icons.account_balance_wallet_rounded, 
-                  AppColors.shgTeal,
-                  onTap: () => context.push('/active-loans')
-                ),
-                _buildActionCard(
-                  l10n.pendingEmi, 
-                  '₹${summary.pendingEmiAmount.toInt()}', 
-                  Icons.pending_actions_rounded, 
-                  AppColors.lotusPink,
-                  onTap: () => context.push('/pending-emi')
-                ),
-                _buildActionCard(
-                  l10n.subsidyRecords, 
-                  '₹${summary.totalSubsidyReceived.toInt()}', 
-                  Icons.savings_rounded, 
-                  AppColors.fieldGreen,
-                  onTap: () => context.push('/subsidy-records')
-                ),
-                _buildActionCard(l10n.groupLedger, '', Icons.menu_book_rounded, AppColors.indigo,
-                    onTap: () => context.push('/group-ledger')),
-                _buildActionCard(
-                  l10n.reports, 
-                  '', 
-                  Icons.pie_chart_rounded, 
-                  AppColors.shgTeal,
-                  onTap: () => ref.read(leaderBottomNavIndexProvider.notifier).state = 2,
-                ),
-                _buildActionCard(l10n.notifications, l10n.newNotifications(3), Icons.notifications_active_rounded, AppColors.lotusPink, 
-                    onTap: () => context.push('/notifications')),
-                _buildActionCard(l10n.meetingAttendance, '', Icons.how_to_reg_rounded, AppColors.indigo,
-                    onTap: () => context.push('/meeting-attendance')),
-              ],
+    return summaryAsync.when(
+      data: (summary) => SingleChildScrollView(
+        child: Column(
+          children: [
+            _buildHeader(context, name, l10n),
+            Padding(
+              padding: const EdgeInsets.all(16.0),
+              child: GridView.count(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                crossAxisCount: 2,
+                crossAxisSpacing: 16,
+                mainAxisSpacing: 16,
+                children: [
+                  _buildActionCard(
+                    l10n.totalMembers, 
+                    '${summary.totalMembers}', 
+                    Icons.group_rounded, 
+                    AppColors.shgTeal,
+                    onTap: () => ref.read(leaderBottomNavIndexProvider.notifier).state = 1,
+                  ),
+                  _buildActionCard(
+                    l10n.activeLoans, 
+                    '₹${summary.totalLoanOutstanding.toInt()}', 
+                    Icons.account_balance_wallet_rounded, 
+                    AppColors.shgTeal,
+                    onTap: () => context.push('/active-loans')
+                  ),
+                  _buildActionCard(
+                    l10n.pendingEmi, 
+                    '₹${summary.pendingEmiAmount.toInt()}', 
+                    Icons.pending_actions_rounded, 
+                    AppColors.lotusPink,
+                    onTap: () => context.push('/pending-emi')
+                  ),
+                  _buildActionCard(
+                    l10n.subsidyRecords, 
+                    '₹${summary.totalSubsidyReceived.toInt()}', 
+                    Icons.savings_rounded, 
+                    AppColors.fieldGreen,
+                    onTap: () => context.push('/subsidy-records')
+                  ),
+                  _buildActionCard(l10n.groupLedger, '', Icons.menu_book_rounded, AppColors.indigo,
+                      onTap: () => context.push('/group-ledger')),
+                  _buildActionCard(
+                    l10n.reports, 
+                    '', 
+                    Icons.pie_chart_rounded, 
+                    AppColors.shgTeal,
+                    onTap: () => ref.read(leaderBottomNavIndexProvider.notifier).state = 2,
+                  ),
+                  _buildActionCard(l10n.notifications, l10n.newNotifications(3), Icons.notifications_active_rounded, AppColors.lotusPink, 
+                      onTap: () => context.push('/notifications')),
+                  _buildActionCard(l10n.meetingAttendance, '', Icons.how_to_reg_rounded, AppColors.indigo,
+                      onTap: () => context.push('/meeting-attendance')),
+                ],
+              ),
             ),
-          ),
-          const SizedBox(height: 16),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16.0),
-            child: _buildCommunityPulse(context, l10n),
-          ),
-          const SizedBox(height: 20),
-        ],
+            const SizedBox(height: 16),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16.0),
+              child: _buildCommunityPulse(context, l10n),
+            ),
+            const SizedBox(height: 20),
+          ],
+        ),
       ),
+      loading: () => const Center(child: CircularProgressIndicator()),
+      error: (err, stack) => Center(child: Text('Error: $err')),
     );
   }
 
