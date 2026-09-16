@@ -33,11 +33,19 @@ class LoanBalanceScreen extends StatelessWidget {
             // Summary Progress Card
             Card(
               elevation: 4,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(24),
+              ),
               child: Container(
                 padding: const EdgeInsets.all(24.0),
                 decoration: BoxDecoration(
-                  gradient: AppColors.primaryGradient.withOpacity(0.05) as Gradient?,
+                  gradient: LinearGradient(
+                    colors: AppColors.primaryGradient.colors
+                        .map((color) => color.withValues(alpha: 0.05))
+                        .toList(),
+                    begin: AppColors.primaryGradient.begin,
+                    end: AppColors.primaryGradient.end,
+                  ),
                   borderRadius: BorderRadius.circular(24),
                 ),
                 child: Column(
@@ -67,7 +75,9 @@ class LoanBalanceScreen extends StatelessWidget {
                             ),
                             Text(
                               l10n.repaid,
-                              style: const TextStyle(color: AppColors.textSecondary),
+                              style: const TextStyle(
+                                color: AppColors.textSecondary,
+                              ),
                             ),
                           ],
                         ),
@@ -77,8 +87,16 @@ class LoanBalanceScreen extends StatelessWidget {
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        _buildSummaryItem(l10n.totalLoanAmount, '₹$totalLoan', AppColors.textPrimary),
-                        _buildSummaryItem(l10n.remainingAmount, '₹$remainingAmount', AppColors.secondaryPink),
+                        _buildSummaryItem(
+                          l10n.totalLoanAmount,
+                          '₹$totalLoan',
+                          AppColors.textPrimary,
+                        ),
+                        _buildSummaryItem(
+                          l10n.remainingAmount,
+                          '₹$remainingAmount',
+                          AppColors.secondaryPink,
+                        ),
                       ],
                     ),
                   ],
@@ -86,21 +104,43 @@ class LoanBalanceScreen extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 24),
-            
+
             // Detailed Info Cards
             Text(
               l10n.loanDetails,
-              style: theme.textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold),
+              style: theme.textTheme.headlineSmall?.copyWith(
+                fontWeight: FontWeight.bold,
+              ),
             ),
             const SizedBox(height: 16),
-            
-            _buildDetailCard(Icons.info_outline_rounded, l10n.loanStatus, l10n.active, AppColors.successGreen),
-            _buildDetailCard(Icons.category_outlined, l10n.loanType, l10n.shgBankLinkage, AppColors.trustBlue),
-            _buildDetailCard(Icons.percent_rounded, l10n.interestRate, '7% (${l10n.yearly})', AppColors.primaryPurple),
-            _buildDetailCard(Icons.payments_outlined, l10n.paidAmount, '₹$paidAmount', AppColors.successGreen),
-            
+
+            _buildDetailCard(
+              Icons.info_outline_rounded,
+              l10n.loanStatus,
+              l10n.active,
+              AppColors.successGreen,
+            ),
+            _buildDetailCard(
+              Icons.category_outlined,
+              l10n.loanType,
+              l10n.shgBankLinkage,
+              AppColors.trustBlue,
+            ),
+            _buildDetailCard(
+              Icons.percent_rounded,
+              l10n.interestRate,
+              '7% (${l10n.yearly})',
+              AppColors.primaryPurple,
+            ),
+            _buildDetailCard(
+              Icons.payments_outlined,
+              l10n.paidAmount,
+              '₹$paidAmount',
+              AppColors.successGreen,
+            ),
+
             const SizedBox(height: 30),
-            
+
             ElevatedButton(
               onPressed: () => context.pop(),
               style: ElevatedButton.styleFrom(
@@ -121,7 +161,10 @@ class LoanBalanceScreen extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(label, style: const TextStyle(color: AppColors.textSecondary, fontSize: 14)),
+        Text(
+          label,
+          style: const TextStyle(color: AppColors.textSecondary, fontSize: 14),
+        ),
         Text(
           value,
           style: TextStyle(
@@ -134,22 +177,34 @@ class LoanBalanceScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildDetailCard(IconData icon, String label, String value, Color iconColor) {
+  Widget _buildDetailCard(
+    IconData icon,
+    String label,
+    String value,
+    Color iconColor,
+  ) {
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
       child: ListTile(
         leading: Container(
           padding: const EdgeInsets.all(8),
           decoration: BoxDecoration(
-            color: iconColor.withOpacity(0.1),
+            color: iconColor.withValues(alpha: 0.1),
             shape: BoxShape.circle,
           ),
           child: Icon(icon, color: iconColor),
         ),
-        title: Text(label, style: const TextStyle(fontSize: 14, color: AppColors.textSecondary)),
+        title: Text(
+          label,
+          style: const TextStyle(fontSize: 14, color: AppColors.textSecondary),
+        ),
         trailing: Text(
           value,
-          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppColors.textPrimary),
+          style: const TextStyle(
+            fontSize: 16,
+            fontWeight: FontWeight.bold,
+            color: AppColors.textPrimary,
+          ),
         ),
       ),
     );

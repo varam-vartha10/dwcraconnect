@@ -31,10 +31,15 @@ class EmiDetailsScreen extends ConsumerWidget {
           }
 
           // Sort EMIs by installment number
-          final sortedEmis = List<EmiEntity>.from(emis)..sort((a, b) => a.installmentNumber.compareTo(b.installmentNumber));
-          
+          final sortedEmis = List<EmiEntity>.from(
+            emis,
+          )..sort((a, b) => a.installmentNumber.compareTo(b.installmentNumber));
+
           // Find next pending EMI
-          final nextEmi = sortedEmis.firstWhere((e) => e.status != 'paid', orElse: () => sortedEmis.last);
+          final nextEmi = sortedEmis.firstWhere(
+            (e) => e.status != 'paid',
+            orElse: () => sortedEmis.last,
+          );
           final paidEmis = sortedEmis.where((e) => e.status == 'paid').length;
           final totalEmis = sortedEmis.length;
 
@@ -47,7 +52,9 @@ class EmiDetailsScreen extends ConsumerWidget {
                 Card(
                   elevation: 8,
                   shadowColor: AppColors.secondaryPink.withValues(alpha: 0.2),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(24),
+                  ),
                   child: Container(
                     padding: const EdgeInsets.all(24.0),
                     decoration: BoxDecoration(
@@ -62,7 +69,10 @@ class EmiDetailsScreen extends ConsumerWidget {
                       children: [
                         Text(
                           l10n.nextEmi,
-                          style: const TextStyle(color: Colors.white70, fontSize: 16),
+                          style: const TextStyle(
+                            color: Colors.white70,
+                            fontSize: 16,
+                          ),
                         ),
                         const SizedBox(height: 8),
                         Text(
@@ -75,7 +85,10 @@ class EmiDetailsScreen extends ConsumerWidget {
                         ),
                         const SizedBox(height: 20),
                         Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 16,
+                            vertical: 8,
+                          ),
                           decoration: BoxDecoration(
                             color: Colors.white.withValues(alpha: 0.2),
                             borderRadius: BorderRadius.circular(30),
@@ -83,11 +96,18 @@ class EmiDetailsScreen extends ConsumerWidget {
                           child: Row(
                             mainAxisSize: MainAxisSize.min,
                             children: [
-                              const Icon(Icons.calendar_today_rounded, color: Colors.white, size: 18),
+                              const Icon(
+                                Icons.calendar_today_rounded,
+                                color: Colors.white,
+                                size: 18,
+                              ),
                               const SizedBox(width: 8),
                               Text(
                                 '${l10n.dueDate}: ${DateFormat('dd MMM yyyy').format(nextEmi.dueDate)}',
-                                style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.w600,
+                                ),
                               ),
                             ],
                           ),
@@ -101,10 +121,12 @@ class EmiDetailsScreen extends ConsumerWidget {
                 // EMI Schedule Summary
                 Text(
                   l10n.repaymentSchedule,
-                  style: theme.textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold),
+                  style: theme.textTheme.headlineSmall?.copyWith(
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
                 const SizedBox(height: 16),
-                
+
                 _buildScheduleInfoCard(
                   context,
                   l10n.remainingEmis,
@@ -119,37 +141,48 @@ class EmiDetailsScreen extends ConsumerWidget {
                   Icons.star_rounded,
                   AppColors.successGreen,
                 ),
-                
+
                 const SizedBox(height: 24),
-                
+
                 // Helpful Reminder Card
                 Container(
                   padding: const EdgeInsets.all(16),
                   decoration: BoxDecoration(
                     color: AppColors.trustBlue.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(16),
-                    border: Border.all(color: AppColors.trustBlue.withValues(alpha: 0.3)),
+                    border: Border.all(
+                      color: AppColors.trustBlue.withValues(alpha: 0.3),
+                    ),
                   ),
                   child: Row(
                     children: [
-                      const Icon(Icons.info_outline_rounded, color: AppColors.trustBlue),
+                      const Icon(
+                        Icons.info_outline_rounded,
+                        color: AppColors.trustBlue,
+                      ),
                       const SizedBox(width: 12),
                       Expanded(
                         child: Text(
                           l10n.timelyRepaymentTip,
-                          style: const TextStyle(color: AppColors.trustBlue, fontSize: 13, fontWeight: FontWeight.w500),
+                          style: const TextStyle(
+                            color: AppColors.trustBlue,
+                            fontSize: 13,
+                            fontWeight: FontWeight.w500,
+                          ),
                         ),
                       ),
                     ],
                   ),
                 ),
-                
+
                 const SizedBox(height: 24),
 
                 // Installment List Header
                 Text(
-                  'Installment Tracker (${paidEmis}/${totalEmis})',
-                  style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
+                  'Installment Tracker ($paidEmis/$totalEmis)',
+                  style: theme.textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
                 const SizedBox(height: 12),
 
@@ -164,29 +197,49 @@ class EmiDetailsScreen extends ConsumerWidget {
                       margin: const EdgeInsets.only(bottom: 8),
                       child: ListTile(
                         leading: CircleAvatar(
-                          backgroundColor: isPaid ? AppColors.successGreen.withValues(alpha: 0.1) : AppColors.background,
-                          child: Text('${emi.installmentNumber}', style: TextStyle(color: isPaid ? AppColors.successGreen : AppColors.textPrimary)),
+                          backgroundColor: isPaid
+                              ? AppColors.successGreen.withValues(alpha: 0.1)
+                              : AppColors.background,
+                          child: Text(
+                            '${emi.installmentNumber}',
+                            style: TextStyle(
+                              color: isPaid
+                                  ? AppColors.successGreen
+                                  : AppColors.textPrimary,
+                            ),
+                          ),
                         ),
                         title: Text('₹${emi.amount.toInt()}'),
-                        subtitle: Text(DateFormat('dd/MM/yyyy').format(emi.dueDate)),
+                        subtitle: Text(
+                          DateFormat('dd/MM/yyyy').format(emi.dueDate),
+                        ),
                         trailing: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 4,
+                          ),
                           decoration: BoxDecoration(
-                            color: _getStatusColor(emi.status).withValues(alpha: 0.1),
+                            color: _getStatusColor(
+                              emi.status,
+                            ).withValues(alpha: 0.1),
                             borderRadius: BorderRadius.circular(8),
                           ),
                           child: Text(
                             emi.status.toUpperCase(),
-                            style: TextStyle(color: _getStatusColor(emi.status), fontSize: 10, fontWeight: FontWeight.bold),
+                            style: TextStyle(
+                              color: _getStatusColor(emi.status),
+                              fontSize: 10,
+                              fontWeight: FontWeight.bold,
+                            ),
                           ),
                         ),
                       ),
                     );
                   },
                 ),
-                
+
                 const SizedBox(height: 32),
-                
+
                 OutlinedButton(
                   onPressed: () => context.pop(),
                   child: Text(l10n.backToDashboard),
@@ -204,14 +257,24 @@ class EmiDetailsScreen extends ConsumerWidget {
 
   Color _getStatusColor(String status) {
     switch (status) {
-      case 'paid': return AppColors.successGreen;
-      case 'overdue': return Colors.redAccent;
-      case 'pending': return Colors.orange;
-      default: return AppColors.textSecondary;
+      case 'paid':
+        return AppColors.successGreen;
+      case 'overdue':
+        return Colors.redAccent;
+      case 'pending':
+        return Colors.orange;
+      default:
+        return AppColors.textSecondary;
     }
   }
 
-  Widget _buildScheduleInfoCard(BuildContext context, String title, String value, IconData icon, Color iconColor) {
+  Widget _buildScheduleInfoCard(
+    BuildContext context,
+    String title,
+    String value,
+    IconData icon,
+    Color iconColor,
+  ) {
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
       child: Padding(
@@ -225,10 +288,20 @@ class EmiDetailsScreen extends ConsumerWidget {
             ),
             child: Icon(icon, color: iconColor),
           ),
-          title: Text(title, style: const TextStyle(fontSize: 14, color: AppColors.textSecondary)),
+          title: Text(
+            title,
+            style: const TextStyle(
+              fontSize: 14,
+              color: AppColors.textSecondary,
+            ),
+          ),
           trailing: Text(
             value,
-            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppColors.textPrimary),
+            style: const TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.bold,
+              color: AppColors.textPrimary,
+            ),
           ),
         ),
       ),

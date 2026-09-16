@@ -38,85 +38,51 @@ class AuthNotifier extends StateNotifier<AuthState> {
     _init();
   }
 
-  static const String _userPhoneKey = 'logged_in_user_phone';
-
   Future<void> _init() async {
-  final prefs = await SharedPreferences.getInstance();
-
-  final phone = prefs.getString(_userPhoneKey);
-
-  if (phone != null) {
-    // We will implement token/session restoration
-    // after the basic API login is working.
-    state = state.copyWith(
-      isInitialized: true,
-    );
-  } else {
-    state = state.copyWith(
-      isInitialized: true,
-    );
-  }
-}
-
-
-Future<UserRole> login(
-  String phoneNumber,
-  String password,
-) async {
-  state = state.copyWith(
-    isLoading: true,
-    errorMessage: null,
-  );
-
-  try {
-    final user = await UserRepository.login(
-      phoneNumber,
-      password,
-    );
-
     final prefs = await SharedPreferences.getInstance();
+    final token = prefs.getString('auth_token');
 
-    await prefs.setString(
-      _userPhoneKey,
-      user.phoneNumber,
-    );
-
-    state = AuthState(
-      user: user,
-      isLoading: false,
-      isInitialized: true,
-    );
-
-    // Reset navigation after login
-    if (user.role == UserRole.leader) {
-      _ref
-          .read(leaderBottomNavIndexProvider.notifier)
-          .state = 0;
-    } else {
-      _ref
-          .read(memberBottomNavIndexProvider.notifier)
-          .state = 0;
+    if (token != null) {
+      final user = await UserRepository.getProfile();
+      if (user != null) {
+        state = state.copyWith(user: user, isInitialized: true);
+        return;
+      }
     }
-
-    return user.role;
-  } catch (error) {
-    state = state.copyWith(
-      isLoading: false,
-      errorMessage: error
-          .toString()
-          .replaceFirst('Exception: ', ''),
-    );
-
-    return UserRole.unknown;
+    state = state.copyWith(isInitialized: true);
   }
-}
+
+  Future<UserRole> login(String phoneNumber, String password) async {
+    state = state.copyWith(isLoading: true, errorMessage: null);
+
+    try {
+      final user = await UserRepository.login(phoneNumber, password);
+
+      state = AuthState(
+        user: user,
+        isLoading: false,
+        isInitialized: true,
+      );
+
+      if (user.role == UserRole.leader) {
+        _ref.read(leaderBottomNavIndexProvider.notifier).state = 0;
+      } else {
+        _ref.read(memberBottomNavIndexProvider.notifier).state = 0;
+      }
+
+      return user.role;
+    } catch (error) {
+      state = state.copyWith(
+        isLoading: false,
+        errorMessage: error.toString().replaceFirst('Exception: ', ''),
+      );
+      return UserRole.unknown;
+    }
+  }
 
   Future<void> logout() async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.remove(_userPhoneKey);
-    
+    await UserRepository.logout();
     state = AuthState(isInitialized: true);
-    // Reset indices on logout
     _ref.read(leaderBottomNavIndexProvider.notifier).state = 0;
     _ref.read(memberBottomNavIndexProvider.notifier).state = 0;
   }

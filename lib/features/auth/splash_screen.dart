@@ -15,7 +15,8 @@ class SplashScreen extends ConsumerStatefulWidget {
   ConsumerState<SplashScreen> createState() => _SplashScreenState();
 }
 
-class _SplashScreenState extends ConsumerState<SplashScreen> with SingleTickerProviderStateMixin {
+class _SplashScreenState extends ConsumerState<SplashScreen>
+    with SingleTickerProviderStateMixin {
   late AnimationController _controller;
   late Animation<double> _fadeAnimation;
   late Animation<double> _scaleAnimation;
@@ -49,12 +50,12 @@ class _SplashScreenState extends ConsumerState<SplashScreen> with SingleTickerPr
   Future<void> _navigateToNext() async {
     // Wait for animation and auth initialization
     await Future.delayed(const Duration(seconds: 3));
-    
+
     if (!mounted) return;
-    
+
     final prefs = await SharedPreferences.getInstance();
     final hasSelectedLocale = prefs.containsKey('selected_locale');
-    
+
     final authState = ref.read(authProvider);
 
     // Wait for auth provider to initialize if it hasn't yet
@@ -62,6 +63,8 @@ class _SplashScreenState extends ConsumerState<SplashScreen> with SingleTickerPr
       // Just wait a tiny bit more or the provider's init will finish soon
       await Future.delayed(const Duration(milliseconds: 500));
     }
+
+    if (!mounted) return;
 
     if (!hasSelectedLocale) {
       context.go('/language-selection');
@@ -105,10 +108,7 @@ class _SplashScreenState extends ConsumerState<SplashScreen> with SingleTickerPr
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 // Unified Logo Widget
-                DwcraLogo(
-                  size: 160,
-                  isCircular: true,
-                ),
+                DwcraLogo(size: 160, isCircular: true),
                 const SizedBox(height: 32),
                 // App Name
                 Text(

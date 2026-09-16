@@ -10,10 +10,12 @@ class TransactionHistoryScreen extends ConsumerStatefulWidget {
   const TransactionHistoryScreen({super.key});
 
   @override
-  ConsumerState<TransactionHistoryScreen> createState() => _TransactionHistoryScreenState();
+  ConsumerState<TransactionHistoryScreen> createState() =>
+      _TransactionHistoryScreenState();
 }
 
-class _TransactionHistoryScreenState extends ConsumerState<TransactionHistoryScreen> {
+class _TransactionHistoryScreenState
+    extends ConsumerState<TransactionHistoryScreen> {
   final TextEditingController _searchController = TextEditingController();
   String _selectedFilter = 'all';
 
@@ -27,11 +29,16 @@ class _TransactionHistoryScreenState extends ConsumerState<TransactionHistoryScr
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
     final user = ref.watch(authProvider).user;
-    final transactions = user?.role == UserRole.member ? ref.watch(memberTransactionsProvider) : ref.watch(transactionsProvider);
-    
+    final transactions = user?.role == UserRole.member
+        ? ref.watch(memberTransactionsProvider)
+        : ref.watch(transactionsProvider);
+
     final filteredTransactions = transactions.where((tx) {
-      final matchesSearch = tx.description.toLowerCase().contains(_searchController.text.toLowerCase());
-      final matchesFilter = _selectedFilter == 'all' || tx.type.toLowerCase() == _selectedFilter;
+      final matchesSearch = tx.description.toLowerCase().contains(
+        _searchController.text.toLowerCase(),
+      );
+      final matchesFilter =
+          _selectedFilter == 'all' || tx.type.toLowerCase() == _selectedFilter;
       return matchesSearch && matchesFilter;
     }).toList();
 
@@ -81,7 +88,9 @@ class _TransactionHistoryScreenState extends ConsumerState<TransactionHistoryScr
                               _selectedFilter = entry.key;
                             });
                           },
-                          selectedColor: AppColors.primaryPurple.withOpacity(0.2),
+                          selectedColor: AppColors.primaryPurple.withValues(
+                            alpha: 0.2,
+                          ),
                           checkmarkColor: AppColors.primaryPurple,
                         ),
                       );
@@ -96,9 +105,39 @@ class _TransactionHistoryScreenState extends ConsumerState<TransactionHistoryScr
             padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
             child: Row(
               children: [
-                Expanded(flex: 2, child: Text(l10n.date, style: const TextStyle(fontWeight: FontWeight.bold, color: AppColors.textSecondary))),
-                Expanded(flex: 3, child: Text(l10n.description, style: const TextStyle(fontWeight: FontWeight.bold, color: AppColors.textSecondary))),
-                Expanded(flex: 2, child: Align(alignment: Alignment.centerRight, child: Text(l10n.amount, style: const TextStyle(fontWeight: FontWeight.bold, color: AppColors.textSecondary)))),
+                Expanded(
+                  flex: 2,
+                  child: Text(
+                    l10n.date,
+                    style: const TextStyle(
+                      fontWeight: FontWeight.bold,
+                      color: AppColors.textSecondary,
+                    ),
+                  ),
+                ),
+                Expanded(
+                  flex: 3,
+                  child: Text(
+                    l10n.description,
+                    style: const TextStyle(
+                      fontWeight: FontWeight.bold,
+                      color: AppColors.textSecondary,
+                    ),
+                  ),
+                ),
+                Expanded(
+                  flex: 2,
+                  child: Align(
+                    alignment: Alignment.centerRight,
+                    child: Text(
+                      l10n.amount,
+                      style: const TextStyle(
+                        fontWeight: FontWeight.bold,
+                        color: AppColors.textSecondary,
+                      ),
+                    ),
+                  ),
+                ),
               ],
             ),
           ),
@@ -111,19 +150,28 @@ class _TransactionHistoryScreenState extends ConsumerState<TransactionHistoryScr
                 final isCredit = tx.type == 'Credit';
 
                 return Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 24,
+                    vertical: 16,
+                  ),
                   child: Row(
                     children: [
                       Expanded(
                         flex: 2,
                         child: Text(
                           "${tx.date.day} ${_getMonth(tx.date.month)} ${tx.date.year}",
-                          style: const TextStyle(fontSize: 13, color: AppColors.textSecondary),
+                          style: const TextStyle(
+                            fontSize: 13,
+                            color: AppColors.textSecondary,
+                          ),
                         ),
                       ),
                       Expanded(
                         flex: 3,
-                        child: Text(tx.description, style: const TextStyle(fontWeight: FontWeight.w600)),
+                        child: Text(
+                          tx.description,
+                          style: const TextStyle(fontWeight: FontWeight.w600),
+                        ),
                       ),
                       Expanded(
                         flex: 2,
@@ -133,7 +181,9 @@ class _TransactionHistoryScreenState extends ConsumerState<TransactionHistoryScr
                             '${isCredit ? '+' : '-'} ₹${tx.amount.abs()}',
                             style: TextStyle(
                               fontWeight: FontWeight.bold,
-                              color: isCredit ? AppColors.successGreen : Colors.redAccent,
+                              color: isCredit
+                                  ? AppColors.successGreen
+                                  : Colors.redAccent,
                             ),
                           ),
                         ),
@@ -150,7 +200,20 @@ class _TransactionHistoryScreenState extends ConsumerState<TransactionHistoryScr
   }
 
   String _getMonth(int month) {
-    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    const months = [
+      'Jan',
+      'Feb',
+      'Mar',
+      'Apr',
+      'May',
+      'Jun',
+      'Jul',
+      'Aug',
+      'Sep',
+      'Oct',
+      'Nov',
+      'Dec',
+    ];
     return months[month - 1];
   }
 }

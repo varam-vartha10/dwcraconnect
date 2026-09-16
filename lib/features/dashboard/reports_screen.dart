@@ -34,9 +34,7 @@ class ReportsScreen extends StatelessWidget {
     ];
 
     return Scaffold(
-      appBar: AppBar(
-        title: Text(l10n.reports),
-      ),
+      appBar: AppBar(title: Text(l10n.reports)),
       body: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -44,7 +42,9 @@ class ReportsScreen extends StatelessWidget {
             padding: const EdgeInsets.all(20.0),
             child: Text(
               l10n.selectReportType,
-              style: theme.textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold),
+              style: theme.textTheme.headlineSmall?.copyWith(
+                fontWeight: FontWeight.bold,
+              ),
             ),
           ),
           Expanded(
@@ -60,17 +60,21 @@ class ReportsScreen extends StatelessWidget {
                     leading: Container(
                       padding: const EdgeInsets.all(12),
                       decoration: BoxDecoration(
-                        color: report['color'].withOpacity(0.1),
+                        color: report['color'].withValues(alpha: 0.1),
                         shape: BoxShape.circle,
                       ),
                       child: Icon(report['icon'], color: report['color']),
                     ),
                     title: Text(
                       report['title'],
-                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                      style: const TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 16,
+                      ),
                     ),
                     trailing: const Icon(Icons.chevron_right_rounded),
-                    onTap: () => _showExportOptions(context, report['title'], l10n),
+                    onTap: () =>
+                        _showExportOptions(context, report['title'], l10n),
                   ),
                 );
               },
@@ -81,7 +85,11 @@ class ReportsScreen extends StatelessWidget {
     );
   }
 
-  void _showExportOptions(BuildContext context, String title, AppLocalizations l10n) {
+  void _showExportOptions(
+    BuildContext context,
+    String title,
+    AppLocalizations l10n,
+  ) {
     showModalBottomSheet(
       context: context,
       shape: const RoundedRectangleBorder(
@@ -95,7 +103,10 @@ class ReportsScreen extends StatelessWidget {
             children: [
               Text(
                 l10n.exportReport(title),
-                style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                style: const TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                ),
               ),
               const SizedBox(height: 24),
               Row(
@@ -146,7 +157,7 @@ class ReportsScreen extends StatelessWidget {
           Container(
             padding: const EdgeInsets.all(20),
             decoration: BoxDecoration(
-              color: color.withOpacity(0.1),
+              color: color.withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(16),
             ),
             child: Icon(icon, color: color, size: 32),

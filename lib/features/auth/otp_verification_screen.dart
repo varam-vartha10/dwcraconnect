@@ -10,11 +10,15 @@ class OtpVerificationScreen extends ConsumerStatefulWidget {
   const OtpVerificationScreen({super.key, required this.phoneNumber});
 
   @override
-  ConsumerState<OtpVerificationScreen> createState() => _OtpVerificationScreenState();
+  ConsumerState<OtpVerificationScreen> createState() =>
+      _OtpVerificationScreenState();
 }
 
 class _OtpVerificationScreenState extends ConsumerState<OtpVerificationScreen> {
-  final List<TextEditingController> _controllers = List.generate(6, (index) => TextEditingController());
+  final List<TextEditingController> _controllers = List.generate(
+    6,
+    (index) => TextEditingController(),
+  );
   final List<FocusNode> _focusNodes = List.generate(6, (index) => FocusNode());
 
   @override
@@ -55,9 +59,7 @@ class _OtpVerificationScreenState extends ConsumerState<OtpVerificationScreen> {
     final theme = Theme.of(context);
 
     return Scaffold(
-      appBar: AppBar(
-        title: Text(l10n.otpVerification),
-      ),
+      appBar: AppBar(title: Text(l10n.otpVerification)),
       body: Padding(
         padding: const EdgeInsets.all(24.0),
         child: Column(
@@ -90,16 +92,24 @@ class _OtpVerificationScreenState extends ConsumerState<OtpVerificationScreen> {
                     keyboardType: TextInputType.number,
                     textAlign: TextAlign.center,
                     maxLength: 1,
-                    style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                    style: const TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.bold,
+                    ),
                     decoration: InputDecoration(
                       counterText: "",
                       enabledBorder: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(8),
-                        borderSide: const BorderSide(color: AppColors.textSecondary),
+                        borderSide: const BorderSide(
+                          color: AppColors.textSecondary,
+                        ),
                       ),
                       focusedBorder: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(8),
-                        borderSide: const BorderSide(color: AppColors.primaryPurple, width: 2),
+                        borderSide: const BorderSide(
+                          color: AppColors.primaryPurple,
+                          width: 2,
+                        ),
                       ),
                     ),
                     onChanged: (value) {
@@ -109,9 +119,7 @@ class _OtpVerificationScreenState extends ConsumerState<OtpVerificationScreen> {
                         _focusNodes[index - 1].requestFocus();
                       }
                     },
-                    inputFormatters: [
-                      FilteringTextInputFormatter.digitsOnly,
-                    ],
+                    inputFormatters: [FilteringTextInputFormatter.digitsOnly],
                   ),
                 );
               }),
@@ -123,7 +131,7 @@ class _OtpVerificationScreenState extends ConsumerState<OtpVerificationScreen> {
                 borderRadius: BorderRadius.circular(30),
                 boxShadow: [
                   BoxShadow(
-                    color: AppColors.primaryPurple.withOpacity(0.3),
+                    color: AppColors.primaryPurple.withValues(alpha: 0.3),
                     blurRadius: 10,
                     offset: const Offset(0, 5),
                   ),

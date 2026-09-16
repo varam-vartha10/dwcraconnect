@@ -27,7 +27,8 @@ class MemberDashboardScreen extends ConsumerWidget {
         actions: [
           IconButton(
             icon: const Icon(Icons.notifications_outlined),
-            onPressed: () => ref.read(memberBottomNavIndexProvider.notifier).state = 1,
+            onPressed: () =>
+                ref.read(memberBottomNavIndexProvider.notifier).state = 1,
           ),
         ],
       ),
@@ -42,11 +43,21 @@ class MemberDashboardScreen extends ConsumerWidget {
       ),
       bottomNavigationBar: BottomNavigationBar(
         currentIndex: selectedIndex,
-        onTap: (index) => ref.read(memberBottomNavIndexProvider.notifier).state = index,
+        onTap: (index) =>
+            ref.read(memberBottomNavIndexProvider.notifier).state = index,
         items: [
-          BottomNavigationBarItem(icon: const Icon(Icons.home_rounded), label: l10n.home),
-          BottomNavigationBarItem(icon: const Icon(Icons.notifications_rounded), label: l10n.alerts),
-          BottomNavigationBarItem(icon: const Icon(Icons.person_rounded), label: l10n.profile),
+          BottomNavigationBarItem(
+            icon: const Icon(Icons.home_rounded),
+            label: l10n.home,
+          ),
+          BottomNavigationBarItem(
+            icon: const Icon(Icons.notifications_rounded),
+            label: l10n.alerts,
+          ),
+          BottomNavigationBarItem(
+            icon: const Icon(Icons.person_rounded),
+            label: l10n.profile,
+          ),
         ],
       ),
     );
@@ -61,7 +72,7 @@ class _MemberHome extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final l10n = AppLocalizations.of(context)!;
     final member = ref.watch(currentMemberProvider);
-    
+
     final loanBal = member?.remainingAmount ?? 0.0;
     final emiAmt = member?.emiAmount ?? 0.0;
     final subAmt = member?.subsidyAmount ?? 0.0;
@@ -69,7 +80,12 @@ class _MemberHome extends ConsumerWidget {
     return SingleChildScrollView(
       child: Column(
         children: [
-          _buildWelcomeCard(context, name, member?.shgGroup ?? 'Saraswati SHG', l10n),
+          _buildWelcomeCard(
+            context,
+            name,
+            member?.shgGroup ?? 'Saraswati SHG',
+            l10n,
+          ),
           Padding(
             padding: const EdgeInsets.all(16.0),
             child: GridView.count(
@@ -79,20 +95,38 @@ class _MemberHome extends ConsumerWidget {
               crossAxisSpacing: 16,
               mainAxisSpacing: 16,
               children: [
-                _buildStatCard(l10n.activeLoans, '₹${loanBal.toInt()}', Icons.account_balance_wallet_rounded, AppColors.shgTeal, onTap: () => context.push('/loan-balance')),
-                _buildStatCard(l10n.nextEmi, '₹${emiAmt.toInt()}', Icons.event_note_rounded, AppColors.lotusPink, onTap: () => context.push('/emi-details')),
-                _buildStatCard(l10n.subsidy, '₹${subAmt.toInt()}', Icons.savings_rounded, AppColors.fieldGreen, onTap: () => context.push('/subsidy-details')),
                 _buildStatCard(
-                  l10n.transactionHistory, 
-                  l10n.viewAll, 
-                  Icons.history_rounded, 
+                  l10n.activeLoans,
+                  '₹${loanBal.toInt()}',
+                  Icons.account_balance_wallet_rounded,
+                  AppColors.shgTeal,
+                  onTap: () => context.push('/loan-balance'),
+                ),
+                _buildStatCard(
+                  l10n.nextEmi,
+                  '₹${emiAmt.toInt()}',
+                  Icons.event_note_rounded,
+                  AppColors.lotusPink,
+                  onTap: () => context.push('/emi-details'),
+                ),
+                _buildStatCard(
+                  l10n.subsidy,
+                  '₹${subAmt.toInt()}',
+                  Icons.savings_rounded,
+                  AppColors.fieldGreen,
+                  onTap: () => context.push('/subsidy-details'),
+                ),
+                _buildStatCard(
+                  l10n.transactionHistory,
+                  l10n.viewAll,
+                  Icons.history_rounded,
                   AppColors.indigo,
                   onTap: () => context.push('/transaction-history'),
                 ),
                 _buildStatCard(
-                  l10n.trainingHub, 
-                  '3 Videos', 
-                  Icons.play_circle_fill_rounded, 
+                  l10n.trainingHub,
+                  '3 Videos',
+                  Icons.play_circle_fill_rounded,
                   AppColors.fieldGreen,
                   onTap: () => context.push('/training-hub'),
                 ),
@@ -107,26 +141,53 @@ class _MemberHome extends ConsumerWidget {
     );
   }
 
-  Widget _buildWelcomeCard(BuildContext context, String name, String group, AppLocalizations l10n) {
+  Widget _buildWelcomeCard(
+    BuildContext context,
+    String name,
+    String group,
+    AppLocalizations l10n,
+  ) {
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.fromLTRB(24, 20, 24, 40),
       decoration: const BoxDecoration(
         gradient: AppColors.primaryGradient,
-        borderRadius: BorderRadius.only(bottomLeft: Radius.circular(32), bottomRight: Radius.circular(32)),
+        borderRadius: BorderRadius.only(
+          bottomLeft: Radius.circular(32),
+          bottomRight: Radius.circular(32),
+        ),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
-              CircleAvatar(radius: 35, backgroundColor: Colors.white.withOpacity(0.2), child: const Icon(Icons.person_rounded, size: 40, color: Colors.white)),
+              CircleAvatar(
+                radius: 35,
+                backgroundColor: Colors.white.withValues(alpha: 0.2),
+                child: const Icon(
+                  Icons.person_rounded,
+                  size: 40,
+                  color: Colors.white,
+                ),
+              ),
               const SizedBox(width: 20),
               Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text('${l10n.namaste},', style: Theme.of(context).textTheme.bodyLarge?.copyWith(color: Colors.white70)),
-                  Text(name, style: Theme.of(context).textTheme.headlineMedium?.copyWith(color: Colors.white, fontWeight: FontWeight.bold)),
+                  Text(
+                    '${l10n.namaste},',
+                    style: Theme.of(
+                      context,
+                    ).textTheme.bodyLarge?.copyWith(color: Colors.white70),
+                  ),
+                  Text(
+                    name,
+                    style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                      color: Colors.white,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
                 ],
               ),
             ],
@@ -135,12 +196,15 @@ class _MemberHome extends ConsumerWidget {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
             decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.15),
+              color: Colors.white.withValues(alpha: 0.15),
               borderRadius: BorderRadius.circular(20),
             ),
             child: Text(
               group,
-              style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+              style: const TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.bold,
+              ),
             ),
           ),
         ],
@@ -148,7 +212,13 @@ class _MemberHome extends ConsumerWidget {
     );
   }
 
-  Widget _buildStatCard(String title, String value, IconData icon, Color color, {VoidCallback? onTap}) {
+  Widget _buildStatCard(
+    String title,
+    String value,
+    IconData icon,
+    Color color, {
+    VoidCallback? onTap,
+  }) {
     return Card(
       child: InkWell(
         onTap: onTap,
@@ -161,9 +231,22 @@ class _MemberHome extends ConsumerWidget {
             children: [
               Icon(icon, color: color, size: 30),
               const SizedBox(height: 12),
-              Text(title, style: const TextStyle(fontSize: 14, color: AppColors.textSecondary)),
+              Text(
+                title,
+                style: const TextStyle(
+                  fontSize: 14,
+                  color: AppColors.textSecondary,
+                ),
+              ),
               const SizedBox(height: 4),
-              Text(value, style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: color)),
+              Text(
+                value,
+                style: TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                  color: color,
+                ),
+              ),
             ],
           ),
         ),
@@ -171,14 +254,27 @@ class _MemberHome extends ConsumerWidget {
     );
   }
 
-  Widget _buildSectionHeader(BuildContext context, String title, AppLocalizations l10n) {
+  Widget _buildSectionHeader(
+    BuildContext context,
+    String title,
+    AppLocalizations l10n,
+  ) {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(title, style: Theme.of(context).textTheme.headlineSmall?.copyWith(fontSize: 18, fontWeight: FontWeight.bold)),
-          TextButton(onPressed: () => context.push('/transaction-history'), child: Text(l10n.viewAll)),
+          Text(
+            title,
+            style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          TextButton(
+            onPressed: () => context.push('/transaction-history'),
+            child: Text(l10n.viewAll),
+          ),
         ],
       ),
     );
@@ -187,7 +283,7 @@ class _MemberHome extends ConsumerWidget {
   Widget _buildTransactionList(WidgetRef ref, AppLocalizations l10n) {
     final transactions = ref.watch(memberTransactionsProvider);
     final recent = transactions.take(3).toList();
-    
+
     if (recent.isEmpty) {
       return Padding(
         padding: const EdgeInsets.all(20.0),
@@ -205,20 +301,33 @@ class _MemberHome extends ConsumerWidget {
           margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
           child: ListTile(
             leading: CircleAvatar(
-              backgroundColor: AppColors.background, 
+              backgroundColor: AppColors.background,
               child: Icon(
-                tx.type == 'Debit' ? Icons.remove_circle_outline : Icons.add_circle_outline, 
-                color: tx.type == 'Debit' ? Colors.redAccent : AppColors.fieldGreen
-              )
+                tx.type == 'Debit'
+                    ? Icons.remove_circle_outline
+                    : Icons.add_circle_outline,
+                color: tx.type == 'Debit'
+                    ? Colors.redAccent
+                    : AppColors.fieldGreen,
+              ),
             ),
-            title: Text(tx.description == 'EMI Repayment' ? l10n.loanRepayment : (tx.description == 'Monthly Savings' ? l10n.savings : tx.description), style: const TextStyle(fontWeight: FontWeight.bold)),
+            title: Text(
+              tx.description == 'EMI Repayment'
+                  ? l10n.loanRepayment
+                  : (tx.description == 'Monthly Savings'
+                        ? l10n.savings
+                        : tx.description),
+              style: const TextStyle(fontWeight: FontWeight.bold),
+            ),
             subtitle: Text("${tx.date.day}/${tx.date.month}/${tx.date.year}"),
             trailing: Text(
-              '${tx.type == 'Debit' ? '-' : '+'} ₹${tx.amount.toInt()}', 
+              '${tx.type == 'Debit' ? '-' : '+'} ₹${tx.amount.toInt()}',
               style: TextStyle(
-                color: tx.type == 'Debit' ? Colors.redAccent : AppColors.fieldGreen, 
-                fontWeight: FontWeight.bold
-              )
+                color: tx.type == 'Debit'
+                    ? Colors.redAccent
+                    : AppColors.fieldGreen,
+                fontWeight: FontWeight.bold,
+              ),
             ),
           ),
         );

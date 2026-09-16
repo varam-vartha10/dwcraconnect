@@ -29,10 +29,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
 
   Future<void> _handleLogin() async {
     if (_formKey.currentState!.validate()) {
-      final role = await ref.read(authProvider.notifier).login(
-        _mobileController.text,
-        _passwordController.text,
-      );
+      final role = await ref
+          .read(authProvider.notifier)
+          .login(_mobileController.text, _passwordController.text);
 
       if (!mounted) return;
 
@@ -66,12 +65,10 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                 ),
               ),
               child: const SafeArea(
-                child: Center(
-                  child: DwcraLogo(size: 160, isCircular: true),
-                ),
+                child: Center(child: DwcraLogo(size: 160, isCircular: true)),
               ),
             ),
-            
+
             Padding(
               padding: const EdgeInsets.all(24.0),
               child: Form(
@@ -92,13 +89,18 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                       Text(
                         l10n.invalidCredentials,
                         textAlign: TextAlign.center,
-                        style: const TextStyle(color: Colors.redAccent, fontWeight: FontWeight.bold),
+                        style: const TextStyle(
+                          color: Colors.redAccent,
+                          fontWeight: FontWeight.bold,
+                        ),
                       ),
                     ],
                     const SizedBox(height: 30),
                     Text(
                       l10n.mobileNumber,
-                      style: theme.textTheme.bodyLarge?.copyWith(fontWeight: FontWeight.bold),
+                      style: theme.textTheme.bodyLarge?.copyWith(
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
                     const SizedBox(height: 8),
                     TextFormField(
@@ -110,7 +112,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                         prefixIcon: const Icon(Icons.phone_android_rounded),
                       ),
                       validator: (value) {
-                        if (value == null || value.isEmpty || value.length != 10) {
+                        if (value == null ||
+                            value.isEmpty ||
+                            value.length != 10) {
                           return l10n.invalidMobile;
                         }
                         return null;
@@ -119,7 +123,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                     const SizedBox(height: 20),
                     Text(
                       l10n.password,
-                      style: theme.textTheme.bodyLarge?.copyWith(fontWeight: FontWeight.bold),
+                      style: theme.textTheme.bodyLarge?.copyWith(
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
                     const SizedBox(height: 8),
                     TextFormField(
@@ -131,7 +137,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                         prefixIcon: const Icon(Icons.lock_outline_rounded),
                         suffixIcon: IconButton(
                           icon: Icon(
-                            _isPasswordVisible ? Icons.visibility_off : Icons.visibility,
+                            _isPasswordVisible
+                                ? Icons.visibility_off
+                                : Icons.visibility,
                             color: AppColors.textSecondary,
                           ),
                           onPressed: () {
@@ -142,7 +150,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                         ),
                       ),
                       validator: (value) {
-                        if (value == null || value.isEmpty || value.length < 6) {
+                        if (value == null ||
+                            value.isEmpty ||
+                            value.length < 6) {
                           return l10n.invalidPassword;
                         }
                         return null;
@@ -151,12 +161,17 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                     Align(
                       alignment: Alignment.centerRight,
                       child: TextButton(
-                        onPressed: authState.isLoading ? null : () {
-                          context.push('/forgot-password');
-                        },
+                        onPressed: authState.isLoading
+                            ? null
+                            : () {
+                                context.push('/forgot-password');
+                              },
                         child: Text(
                           l10n.forgotPassword,
-                          style: const TextStyle(color: AppColors.primaryPurple, fontWeight: FontWeight.bold),
+                          style: const TextStyle(
+                            color: AppColors.primaryPurple,
+                            fontWeight: FontWeight.bold,
+                          ),
                         ),
                       ),
                     ),
@@ -167,7 +182,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                         borderRadius: BorderRadius.circular(30),
                         boxShadow: [
                           BoxShadow(
-                            color: AppColors.primaryPurple.withOpacity(0.3),
+                            color: AppColors.primaryPurple.withValues(
+                              alpha: 0.3,
+                            ),
                             blurRadius: 10,
                             offset: const Offset(0, 5),
                           ),
@@ -179,12 +196,15 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                           backgroundColor: Colors.transparent,
                           shadowColor: Colors.transparent,
                         ),
-                        child: authState.isLoading 
+                        child: authState.isLoading
                             ? const SizedBox(
-                                height: 20, 
-                                width: 20, 
-                                child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2)
-                              ) 
+                                height: 20,
+                                width: 20,
+                                child: CircularProgressIndicator(
+                                  color: Colors.white,
+                                  strokeWidth: 2,
+                                ),
+                              )
                             : Text(l10n.login),
                       ),
                     ),
@@ -197,9 +217,11 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                           style: theme.textTheme.bodyMedium,
                         ),
                         GestureDetector(
-                          onTap: authState.isLoading ? null : () {
-                            context.push('/register');
-                          },
+                          onTap: authState.isLoading
+                              ? null
+                              : () {
+                                  context.push('/register');
+                                },
                           child: Text(
                             l10n.register,
                             style: const TextStyle(

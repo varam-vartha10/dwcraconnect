@@ -29,7 +29,10 @@ class NotificationsScreen extends ConsumerWidget {
             onPressed: () => _markAllRead(ref),
             child: Text(
               l10n.markAllRead,
-              style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+              style: const TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.bold,
+              ),
             ),
           ),
         ],
@@ -39,7 +42,11 @@ class NotificationsScreen extends ConsumerWidget {
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Icon(Icons.notifications_off_outlined, size: 80, color: AppColors.textSecondary.withOpacity(0.5)),
+                  Icon(
+                    Icons.notifications_off_outlined,
+                    size: 80,
+                    color: AppColors.textSecondary.withValues(alpha: 0.5),
+                  ),
                   const SizedBox(height: 16),
                   Text(l10n.noNotifications),
                 ],
@@ -56,7 +63,11 @@ class NotificationsScreen extends ConsumerWidget {
     );
   }
 
-  Widget _buildNotificationCard(NotificationEntity n, AppLocalizations l10n, WidgetRef ref) {
+  Widget _buildNotificationCard(
+    NotificationEntity n,
+    AppLocalizations l10n,
+    WidgetRef ref,
+  ) {
     Color categoryColor;
     IconData categoryIcon;
 
@@ -88,7 +99,7 @@ class NotificationsScreen extends ConsumerWidget {
             Container(
               padding: const EdgeInsets.all(10),
               decoration: BoxDecoration(
-                color: categoryColor.withOpacity(0.1),
+                color: categoryColor.withValues(alpha: 0.1),
                 shape: BoxShape.circle,
               ),
               child: Icon(categoryIcon, color: categoryColor),
@@ -111,20 +122,36 @@ class NotificationsScreen extends ConsumerWidget {
         ),
         title: Text(
           n.title,
-          style: TextStyle(fontWeight: n.isRead ? FontWeight.w500 : FontWeight.bold, fontSize: 16),
+          style: TextStyle(
+            fontWeight: n.isRead ? FontWeight.w500 : FontWeight.bold,
+            fontSize: 16,
+          ),
         ),
         subtitle: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             const SizedBox(height: 4),
-            Text(n.message, style: TextStyle(color: AppColors.textPrimary.withOpacity(0.8))),
+            Text(
+              n.message,
+              style: TextStyle(
+                color: AppColors.textPrimary.withValues(alpha: 0.8),
+              ),
+            ),
             const SizedBox(height: 8),
-            Text(n.time, style: const TextStyle(fontSize: 12, color: AppColors.textSecondary)),
+            Text(
+              n.time,
+              style: const TextStyle(
+                fontSize: 12,
+                color: AppColors.textSecondary,
+              ),
+            ),
           ],
         ),
         onTap: () {
           final notifications = ref.read(notificationsProvider);
-          ref.read(notificationsProvider.notifier).state = notifications.map((item) {
+          ref.read(notificationsProvider.notifier).state = notifications.map((
+            item,
+          ) {
             if (item.id == n.id) item.isRead = true;
             return item;
           }).toList();

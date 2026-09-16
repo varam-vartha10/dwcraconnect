@@ -62,56 +62,75 @@ class MemberProfileScreen extends ConsumerWidget {
                   _buildSectionHeader(context, l10n.personalInfo),
                   _buildInfoCard([
                     _buildInfoTile(
-                      context, 
-                      Icons.phone_android_rounded, 
-                      l10n.mobileNumber, 
+                      context,
+                      Icons.phone_android_rounded,
+                      l10n.mobileNumber,
                       user?.phoneNumber ?? 'N/A',
                       trailing: IconButton(
-                        icon: const Icon(Icons.edit_outlined, size: 20, color: AppColors.primaryPurple),
+                        icon: const Icon(
+                          Icons.edit_outlined,
+                          size: 20,
+                          color: AppColors.primaryPurple,
+                        ),
                         onPressed: () => _showEditPhoneDialog(context),
                       ),
                     ),
-                    _buildInfoTile(context, Icons.credit_card_rounded, l10n.aadhaarMasked, member?.aadhaar ?? '**** **** 1234'),
+                    _buildInfoTile(
+                      context,
+                      Icons.credit_card_rounded,
+                      l10n.aadhaarMasked,
+                      member?.aadhaar ?? '**** **** 1234',
+                    ),
                   ]),
-                  
+
                   const SizedBox(height: 24),
                   _buildSectionHeader(context, l10n.groupInfo),
                   _buildInfoCard([
-                    _buildInfoTile(context, Icons.group_work_rounded, l10n.shgGroup, member?.shgGroup ?? 'Saraswati SHG'),
-                    _buildInfoTile(context, Icons.location_city_rounded, l10n.village, member?.village ?? 'Gudlavalleru'),
+                    _buildInfoTile(
+                      context,
+                      Icons.group_work_rounded,
+                      l10n.shgGroup,
+                      member?.shgGroup ?? 'Saraswati SHG',
+                    ),
+                    _buildInfoTile(
+                      context,
+                      Icons.location_city_rounded,
+                      l10n.village,
+                      member?.village ?? 'Gudlavalleru',
+                    ),
                   ]),
 
                   const SizedBox(height: 32),
-                  
+
                   // Actions
                   _buildActionTile(
-                    context, 
-                    Icons.lock_reset_rounded, 
-                    l10n.changePassword, 
+                    context,
+                    Icons.lock_reset_rounded,
+                    l10n.changePassword,
                     AppColors.secondaryPink,
                     () => _showChangePasswordDialog(context),
                   ),
                   const SizedBox(height: 12),
                   _buildActionTile(
-                    context, 
-                    Icons.settings_outlined, 
-                    l10n.settings, 
+                    context,
+                    Icons.settings_outlined,
+                    l10n.settings,
                     AppColors.primaryPurple,
                     () => context.push('/settings'),
                   ),
                   const SizedBox(height: 12),
                   _buildActionTile(
-                    context, 
-                    Icons.language_rounded, 
-                    l10n.changeLanguage, 
+                    context,
+                    Icons.language_rounded,
+                    l10n.changeLanguage,
                     AppColors.trustBlue,
                     () => context.push('/language-selection'),
                   ),
                   const SizedBox(height: 12),
                   _buildActionTile(
-                    context, 
-                    Icons.logout_rounded, 
-                    l10n.logout, 
+                    context,
+                    Icons.logout_rounded,
+                    l10n.logout,
                     Colors.redAccent,
                     () => LogoutDialog.show(context),
                   ),
@@ -136,8 +155,14 @@ class MemberProfileScreen extends ConsumerWidget {
           decoration: InputDecoration(hintText: l10n.enterPhoneHint),
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context), child: Text(l10n.cancel)),
-          ElevatedButton(onPressed: () => Navigator.pop(context), child: Text(l10n.save)),
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text(l10n.cancel),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text(l10n.save),
+          ),
         ],
       ),
     );
@@ -164,8 +189,14 @@ class MemberProfileScreen extends ConsumerWidget {
           ],
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context), child: Text(l10n.cancel)),
-          ElevatedButton(onPressed: () => Navigator.pop(context), child: Text(l10n.save)),
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text(l10n.cancel),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text(l10n.save),
+          ),
         ],
       ),
     );
@@ -185,32 +216,50 @@ class MemberProfileScreen extends ConsumerWidget {
   }
 
   Widget _buildInfoCard(List<Widget> children) {
-    return Card(
-      child: Column(
-        children: children,
-      ),
-    );
+    return Card(child: Column(children: children));
   }
 
-  Widget _buildInfoTile(BuildContext context, IconData icon, String label, String value, {Widget? trailing}) {
+  Widget _buildInfoTile(
+    BuildContext context,
+    IconData icon,
+    String label,
+    String value, {
+    Widget? trailing,
+  }) {
     return ListTile(
       leading: Icon(icon, color: AppColors.primaryPurple, size: 24),
-      title: Text(label, style: const TextStyle(fontSize: 13, color: AppColors.textSecondary)),
-      subtitle: Text(value, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppColors.textPrimary)),
+      title: Text(
+        label,
+        style: const TextStyle(fontSize: 13, color: AppColors.textSecondary),
+      ),
+      subtitle: Text(
+        value,
+        style: const TextStyle(
+          fontSize: 16,
+          fontWeight: FontWeight.bold,
+          color: AppColors.textPrimary,
+        ),
+      ),
       trailing: trailing,
     );
   }
 
-  Widget _buildActionTile(BuildContext context, IconData icon, String label, Color color, VoidCallback onTap) {
+  Widget _buildActionTile(
+    BuildContext context,
+    IconData icon,
+    String label,
+    Color color,
+    VoidCallback onTap,
+  ) {
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(16),
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
         decoration: BoxDecoration(
-          color: color.withOpacity(0.05),
+          color: color.withValues(alpha: 0.05),
           borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: color.withOpacity(0.2)),
+          border: Border.all(color: color.withValues(alpha: 0.2)),
         ),
         child: Row(
           children: [

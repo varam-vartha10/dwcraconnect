@@ -27,9 +27,7 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
     };
 
     return Scaffold(
-      appBar: AppBar(
-        title: Text(l10n.addTransaction),
-      ),
+      appBar: AppBar(title: Text(l10n.addTransaction)),
       body: Padding(
         padding: const EdgeInsets.all(24.0),
         child: Form(
@@ -45,12 +43,17 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
               TextFormField(
                 controller: _amountController,
                 keyboardType: TextInputType.number,
-                style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+                style: const TextStyle(
+                  fontSize: 24,
+                  fontWeight: FontWeight.bold,
+                ),
                 decoration: const InputDecoration(
                   prefixText: '₹ ',
                   hintText: '0.00',
                 ),
-                validator: (value) => (value == null || value.isEmpty) ? l10n.enterAmountHint : null,
+                validator: (value) => (value == null || value.isEmpty)
+                    ? l10n.enterAmountHint
+                    : null,
               ),
               const SizedBox(height: 24),
               Text(
@@ -59,8 +62,10 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
               ),
               const SizedBox(height: 8),
               DropdownButtonFormField<String>(
-                value: _selectedCategory,
-                items: categories.entries.map<DropdownMenuItem<String>>((entry) {
+                initialValue: _selectedCategory,
+                items: categories.entries.map<DropdownMenuItem<String>>((
+                  entry,
+                ) {
                   return DropdownMenuItem<String>(
                     value: entry.key,
                     child: Text(entry.value),
@@ -99,7 +104,10 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       Text("${_selectedDate.toLocal()}".split(' ')[0]),
-                      const Icon(Icons.calendar_today_rounded, color: AppColors.primaryPurple),
+                      const Icon(
+                        Icons.calendar_today_rounded,
+                        color: AppColors.primaryPurple,
+                      ),
                     ],
                   ),
                 ),
@@ -110,7 +118,10 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
                   if (_formKey.currentState!.validate()) {
                     context.pop();
                     ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text(l10n.success), backgroundColor: AppColors.successGreen),
+                      SnackBar(
+                        content: Text(l10n.success),
+                        backgroundColor: AppColors.successGreen,
+                      ),
                     );
                   }
                 },

@@ -12,10 +12,12 @@ class LanguageSelectionScreen extends ConsumerStatefulWidget {
   const LanguageSelectionScreen({super.key});
 
   @override
-  ConsumerState<LanguageSelectionScreen> createState() => _LanguageSelectionScreenState();
+  ConsumerState<LanguageSelectionScreen> createState() =>
+      _LanguageSelectionScreenState();
 }
 
-class _LanguageSelectionScreenState extends ConsumerState<LanguageSelectionScreen> {
+class _LanguageSelectionScreenState
+    extends ConsumerState<LanguageSelectionScreen> {
   String _selectedLanguage = 'en';
 
   @override
@@ -26,9 +28,7 @@ class _LanguageSelectionScreenState extends ConsumerState<LanguageSelectionScree
     return Scaffold(
       body: Container(
         width: double.infinity,
-        decoration: BoxDecoration(
-          color: theme.scaffoldBackgroundColor,
-        ),
+        decoration: BoxDecoration(color: theme.scaffoldBackgroundColor),
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 24.0),
           child: Column(
@@ -36,12 +36,7 @@ class _LanguageSelectionScreenState extends ConsumerState<LanguageSelectionScree
             children: [
               const SizedBox(height: 80),
               // App Logo at Top
-              const Center(
-                child: DwcraLogo(
-                  size: 150,
-                  isCircular: true,
-                ),
-              ),
+              const Center(child: DwcraLogo(size: 150, isCircular: true)),
               const SizedBox(height: 40),
               // Screen Title
               Text(
@@ -91,10 +86,12 @@ class _LanguageSelectionScreenState extends ConsumerState<LanguageSelectionScree
                 child: ElevatedButton(
                   onPressed: () async {
                     // Save language selection locally
-                    await ref.read(localeProvider.notifier).setLocale(Locale(_selectedLanguage));
-                    
-                    if (!mounted) return;
-                    
+                    await ref
+                        .read(localeProvider.notifier)
+                        .setLocale(Locale(_selectedLanguage));
+
+                    if (!context.mounted) return;
+
                     ScaffoldMessenger.of(context).showSnackBar(
                       SnackBar(
                         content: Text(l10n.languageChanged),
@@ -183,14 +180,16 @@ class _LanguageSelectionScreenState extends ConsumerState<LanguageSelectionScree
             Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: isSelected 
+                color: isSelected
                     ? AppColors.primaryPurple.withValues(alpha: 0.1)
                     : AppColors.background,
                 shape: BoxShape.circle,
               ),
               child: Icon(
                 icon,
-                color: isSelected ? AppColors.primaryPurple : AppColors.textSecondary,
+                color: isSelected
+                    ? AppColors.primaryPurple
+                    : AppColors.textSecondary,
                 size: 32,
               ),
             ),
@@ -202,15 +201,14 @@ class _LanguageSelectionScreenState extends ConsumerState<LanguageSelectionScree
                   Text(
                     title,
                     style: theme.textTheme.titleLarge?.copyWith(
-                      color: isSelected ? AppColors.primaryPurple : AppColors.textPrimary,
+                      color: isSelected
+                          ? AppColors.primaryPurple
+                          : AppColors.textPrimary,
                       fontWeight: FontWeight.bold,
                     ),
                   ),
                   const SizedBox(height: 4),
-                  Text(
-                    subtitle,
-                    style: theme.textTheme.bodyMedium,
-                  ),
+                  Text(subtitle, style: theme.textTheme.bodyMedium),
                 ],
               ),
             ),

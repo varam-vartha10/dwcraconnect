@@ -37,18 +37,26 @@ class TrainingHubScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildTrainingCard(String title, String desc, IconData icon, Color color) {
+  Widget _buildTrainingCard(
+    String title,
+    String desc,
+    IconData icon,
+    Color color,
+  ) {
     return Card(
       margin: const EdgeInsets.only(bottom: 16),
       child: ListTile(
         contentPadding: const EdgeInsets.all(16),
         leading: CircleAvatar(
-          backgroundColor: color.withOpacity(0.1),
+          backgroundColor: color.withValues(alpha: 0.1),
           child: Icon(icon, color: color),
         ),
         title: Text(title, style: const TextStyle(fontWeight: FontWeight.bold)),
         subtitle: Text(desc),
-        trailing: const Icon(Icons.play_circle_fill_rounded, color: AppColors.primaryPurple),
+        trailing: const Icon(
+          Icons.play_circle_fill_rounded,
+          color: AppColors.primaryPurple,
+        ),
         onTap: () {},
       ),
     );

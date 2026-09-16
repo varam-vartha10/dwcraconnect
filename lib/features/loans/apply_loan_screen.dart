@@ -26,15 +26,16 @@ class _ApplyLoanScreenState extends State<ApplyLoanScreen> {
     };
 
     return Scaffold(
-      appBar: AppBar(
-        title: Text(l10n.applyLoan),
-      ),
+      appBar: AppBar(title: Text(l10n.applyLoan)),
       body: Padding(
         padding: const EdgeInsets.all(24.0),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Text(l10n.enterRequiredAmount, style: const TextStyle(fontWeight: FontWeight.bold)),
+            Text(
+              l10n.enterRequiredAmount,
+              style: const TextStyle(fontWeight: FontWeight.bold),
+            ),
             const SizedBox(height: 8),
             TextFormField(
               controller: _amountController,
@@ -42,12 +43,18 @@ class _ApplyLoanScreenState extends State<ApplyLoanScreen> {
               decoration: const InputDecoration(prefixText: '₹ '),
             ),
             const SizedBox(height: 24),
-            Text(l10n.purposeOfLoan, style: const TextStyle(fontWeight: FontWeight.bold)),
+            Text(
+              l10n.purposeOfLoan,
+              style: const TextStyle(fontWeight: FontWeight.bold),
+            ),
             const SizedBox(height: 8),
             DropdownButtonFormField<String>(
-              value: _purpose,
+              initialValue: _purpose,
               items: purposes.entries.map<DropdownMenuItem<String>>((entry) {
-                return DropdownMenuItem<String>(value: entry.key, child: Text(entry.value));
+                return DropdownMenuItem<String>(
+                  value: entry.key,
+                  child: Text(entry.value),
+                );
               }).toList(),
               onChanged: (newValue) => setState(() => _purpose = newValue!),
               decoration: const InputDecoration(),
@@ -57,7 +64,10 @@ class _ApplyLoanScreenState extends State<ApplyLoanScreen> {
               onPressed: () {
                 context.pop();
                 ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(content: Text(l10n.applicationSubmitted), backgroundColor: AppColors.successGreen),
+                  SnackBar(
+                    content: Text(l10n.applicationSubmitted),
+                    backgroundColor: AppColors.successGreen,
+                  ),
                 );
               },
               child: Text(l10n.submitApplication),

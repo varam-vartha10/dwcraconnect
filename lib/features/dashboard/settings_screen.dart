@@ -34,61 +34,46 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         child: Column(
           children: [
             const SizedBox(height: 16),
-            _buildSettingsSection(
-              context,
-              l10n.personalInfo,
-              [
-                _buildSettingsTile(
-                  context,
-                  Icons.language_rounded,
-                  l10n.changeLanguage,
-                  onTap: () => context.push('/language-selection'),
-                ),
-                _buildSwitchTile(
-                  context,
-                  Icons.dark_mode_rounded,
-                  l10n.darkMode,
-                  isDarkMode,
-                  (value) => ref.read(themeProvider.notifier).toggleTheme(value),
-                ),
-              ],
-            ),
-            _buildSettingsSection(
-              context,
-              l10n.notificationSettings,
-              [
-                _buildSwitchTile(
-                  context,
-                  Icons.notifications_active_rounded,
-                  l10n.notifications,
-                  _notificationsEnabled,
-                  (value) => setState(() => _notificationsEnabled = value),
-                ),
-              ],
-            ),
-            _buildSettingsSection(
-              context,
-              l10n.securitySettings,
-              [
-                _buildSettingsTile(
-                  context,
-                  Icons.lock_outline_rounded,
-                  l10n.securitySettings,
-                  onTap: () {},
-                ),
-                _buildSettingsTile(
-                  context,
-                  Icons.cloud_upload_outlined,
-                  l10n.backupRestore,
-                  onTap: () {},
-                ),
-              ],
-            ),
+            _buildSettingsSection(context, l10n.personalInfo, [
+              _buildSettingsTile(
+                context,
+                Icons.language_rounded,
+                l10n.changeLanguage,
+                onTap: () => context.push('/language-selection'),
+              ),
+              _buildSwitchTile(
+                context,
+                Icons.dark_mode_rounded,
+                l10n.darkMode,
+                isDarkMode,
+                (value) => ref.read(themeProvider.notifier).toggleTheme(value),
+              ),
+            ]),
+            _buildSettingsSection(context, l10n.notificationSettings, [
+              _buildSwitchTile(
+                context,
+                Icons.notifications_active_rounded,
+                l10n.notifications,
+                _notificationsEnabled,
+                (value) => setState(() => _notificationsEnabled = value),
+              ),
+            ]),
+            _buildSettingsSection(context, l10n.securitySettings, [
+              _buildSettingsTile(
+                context,
+                Icons.lock_outline_rounded,
+                l10n.securitySettings,
+                onTap: () {},
+              ),
+              _buildSettingsTile(
+                context,
+                Icons.cloud_upload_outlined,
+                l10n.backupRestore,
+                onTap: () {},
+              ),
+            ]),
             const SizedBox(height: 32),
-            Text(
-              '${l10n.appVersion}: 1.0.0',
-              style: theme.textTheme.bodySmall,
-            ),
+            Text('${l10n.appVersion}: 1.0.0', style: theme.textTheme.bodySmall),
             const SizedBox(height: 40),
           ],
         ),
@@ -96,7 +81,11 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     );
   }
 
-  Widget _buildSettingsSection(BuildContext context, String title, List<Widget> children) {
+  Widget _buildSettingsSection(
+    BuildContext context,
+    String title,
+    List<Widget> children,
+  ) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -105,22 +94,25 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           child: Text(
             title,
             style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                  color: AppColors.primaryPurple,
-                  fontWeight: FontWeight.bold,
-                ),
+              color: AppColors.primaryPurple,
+              fontWeight: FontWeight.bold,
+            ),
           ),
         ),
         Card(
           margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-          child: Column(
-            children: children,
-          ),
+          child: Column(children: children),
         ),
       ],
     );
   }
 
-  Widget _buildSettingsTile(BuildContext context, IconData icon, String title, {required VoidCallback onTap}) {
+  Widget _buildSettingsTile(
+    BuildContext context,
+    IconData icon,
+    String title, {
+    required VoidCallback onTap,
+  }) {
     return ListTile(
       leading: Icon(icon, color: AppColors.primaryPurple),
       title: Text(title, style: const TextStyle(fontWeight: FontWeight.w500)),
@@ -129,14 +121,20 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     );
   }
 
-  Widget _buildSwitchTile(BuildContext context, IconData icon, String title, bool value, ValueChanged<bool> onChanged) {
+  Widget _buildSwitchTile(
+    BuildContext context,
+    IconData icon,
+    String title,
+    bool value,
+    ValueChanged<bool> onChanged,
+  ) {
     return ListTile(
       leading: Icon(icon, color: AppColors.primaryPurple),
       title: Text(title, style: const TextStyle(fontWeight: FontWeight.w500)),
       trailing: Switch(
         value: value,
         onChanged: onChanged,
-        activeColor: AppColors.primaryPurple,
+        activeThumbColor: AppColors.primaryPurple,
       ),
     );
   }
