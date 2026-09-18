@@ -181,9 +181,46 @@ const migratePasswords = async (req, res) => {
   }
 };
 
+const updateUser = async (req, res) => {
+  try {
+    const { name, phoneNumber, village, aadhaar } = req.body;
+    const user = await User.findOne({ userId: req.user.userId });
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: "User not found",
+      });
+    }
+
+    if (name) user.name = name;
+    if (phoneNumber) user.phoneNumber = phoneNumber;
+    if (village) user.village = village;
+    if (aadhaar) user.aadhaar = aadhaar;
+
+    await user.save();
+
+    const safeUser = user.toObject();
+    delete safeUser.password;
+
+    res.status(200).json({
+      success: true,
+      message: "Profile updated successfully",
+      user: safeUser,
+    });
+  } catch (error) {
+    console.error("Update user error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to update profile",
+    });
+  }
+};
+
 module.exports = {
   getUsers,
   getUsersByGroup,
   createUser,
+  updateUser,
   migratePasswords,
 };

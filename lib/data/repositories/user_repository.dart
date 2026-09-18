@@ -11,7 +11,7 @@ class UserRepository {
     final response = await ApiService.post(
       '/auth/login',
       {
-        'phoneNumber': phoneNumber,
+        'phoneNumber': phoneNumber.trim(),
         'password': password,
       },
     );
@@ -41,6 +41,40 @@ class UserRepository {
       return null;
     } catch (e) {
       return null;
+    }
+  }
+
+  static Future<UserEntity> updateProfile({
+    String? name,
+    String? phoneNumber,
+    String? village,
+    String? aadhaar,
+  }) async {
+    final Map<String, dynamic> body = {};
+    if (name != null) body['name'] = name;
+    if (phoneNumber != null) body['phoneNumber'] = phoneNumber;
+    if (village != null) body['village'] = village;
+    if (aadhaar != null) body['aadhaar'] = aadhaar;
+
+    final response = await ApiService.patch('/users/profile', body);
+    
+    if (response['success'] == true && response['user'] != null) {
+      return _mapToEntity(Map<String, dynamic>.from(response['user']));
+    }
+    throw Exception(response['message'] ?? 'Update failed');
+  }
+
+  static Future<void> changePassword({
+    required String currentPassword,
+    required String newPassword,
+  }) async {
+    final response = await ApiService.post('/auth/change-password', {
+      'currentPassword': currentPassword,
+      'newPassword': newPassword,
+    });
+    
+    if (response['success'] != true) {
+      throw Exception(response['message'] ?? 'Password change failed');
     }
   }
 

@@ -6,7 +6,10 @@ const login = async (req, res) => {
   try {
     let { phoneNumber, password } = req.body;
 
-    console.log(`[Auth] Login attempt for phone: ${phoneNumber}`);
+    // 1. Diagnostics (Safe logs for development)
+    if (process.env.NODE_ENV !== "production") {
+      console.log(`[Auth] Login attempt for phone: ${phoneNumber}`);
+    }
 
     if (!phoneNumber || !password) {
       return res.status(400).json({
@@ -26,7 +29,9 @@ const login = async (req, res) => {
     });
 
     if (!user) {
-      console.log(`[Auth] Login failed: User not found or inactive (${phoneNumber})`);
+      if (process.env.NODE_ENV !== "production") {
+        console.log(`[Auth] Login failed: User not found or inactive (${phoneNumber})`);
+      }
       return res.status(401).json({
         success: false,
         message: "Invalid phone number or password",
@@ -36,7 +41,9 @@ const login = async (req, res) => {
     const isHashed = user.password.startsWith("$2a$") || user.password.startsWith("$2b$");
 
     if (!isHashed) {
-      console.log(`[Auth] CRITICAL: Plain-text password detected for user ${user.userId}.`);
+      if (process.env.NODE_ENV !== "production") {
+        console.log(`[Auth] CRITICAL: Plain-text password detected for user ${user.userId}.`);
+      }
       if (password !== user.password) {
         return res.status(401).json({
           success: false,
@@ -46,7 +53,9 @@ const login = async (req, res) => {
     } else {
       const passwordMatches = await bcrypt.compare(password, user.password);
       if (!passwordMatches) {
-        console.log(`[Auth] Login failed: Password mismatch for ${user.userId}`);
+        if (process.env.NODE_ENV !== "production") {
+          console.log(`[Auth] Login failed: Password mismatch for ${user.userId}`);
+        }
         return res.status(401).json({
           success: false,
           message: "Invalid phone number or password",
@@ -54,11 +63,21 @@ const login = async (req, res) => {
       }
     }
 
-    console.log(`[Auth] Login successful: ${user.userId}`);
+    if (process.env.NODE_ENV !== "production") {
+      console.log(`[Auth] Login successful: ${user.userId}`);
+    }
+
+    if (!process.env.JWT_SECRET) {
+      console.error("CRITICAL: JWT_SECRET environment variable is not set.");
+      return res.status(500).json({
+        success: false,
+        message: "Internal server error. Authentication service is misconfigured.",
+      });
+    }
 
     const token = jwt.sign(
       { id: user._id, userId: user.userId, role: user.role, groupId: user.groupId },
-      process.env.JWT_SECRET || "fallback_secret",
+      process.env.JWT_SECRET,
       { expiresIn: "30d" }
     );
 
@@ -103,7 +122,45 @@ const getMe = async (req, res) => {
   }
 };
 
+const changePassword = async (req, res) => {
+  try {
+    const { currentPassword, newPassword } = req.body;
+    const user = await User.findById(req.user.id);
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: "User not found",
+      });
+    }
+
+    const isMatch = await bcrypt.compare(currentPassword, user.password);
+    if (!isMatch) {
+      return res.status(401).json({
+        success: false,
+        message: "Current password is incorrect",
+      });
+    }
+
+    const salt = await bcrypt.genSalt(12);
+    user.password = await bcrypt.hash(newPassword, salt);
+    await user.save();
+
+    res.status(200).json({
+      success: true,
+      message: "Password changed successfully",
+    });
+  } catch (error) {
+    console.error("Change password error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to change password",
+    });
+  }
+};
+
 module.exports = {
   login,
   getMe,
+  changePassword,
 };

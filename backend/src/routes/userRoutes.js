@@ -4,6 +4,7 @@ const {
   getUsers,
   getUsersByGroup,
   createUser,
+  updateUser,
   migratePasswords,
 } = require("../controllers/userController");
 
@@ -15,8 +16,11 @@ router.get("/", protect, authorize("leader"), getUsers);
 // GET users of a particular group
 router.get("/group/:groupId", protect, getUsersByGroup);
 
-// CREATE user (Usually leaders create members, or admin creates groups)
+// CREATE user
 router.post("/", createUser);
+
+// UPDATE profile
+router.patch("/profile", protect, updateUser);
 
 // TEMPORARY password migration
 router.post("/migrate-passwords", migratePasswords);

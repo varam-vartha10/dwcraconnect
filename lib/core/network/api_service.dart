@@ -1,10 +1,19 @@
 import 'dart:convert';
+import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 
 class ApiService {
-  // Use 10.0.2.2 for Android Emulator, localhost for iOS/Web
-  static const String baseUrl = 'http://10.0.2.2:5000/api';
+  // Development URL (Android Emulator)
+  static const String devBaseUrl = 'http://10.0.2.2:5000/api';
+  
+  // Production URL - Replace with your actual deployed domain
+  static const String prodBaseUrl = 'https://api.dwcraconnect.com/api';
+
+  // Toggle this for production
+  static const bool isProduction = false;
+
+  static String get baseUrl => isProduction ? prodBaseUrl : devBaseUrl;
 
   static Future<Map<String, String>> _getHeaders() async {
     final prefs = await SharedPreferences.getInstance();
@@ -54,6 +63,10 @@ class ApiService {
   }
 
   static Map<String, dynamic> _handleResponse(http.Response response) {
+    if (kDebugMode) {
+      print('API Response: ${response.statusCode} - ${response.body}');
+    }
+
     final data = jsonDecode(response.body);
 
     if (response.statusCode >= 200 && response.statusCode < 300) {

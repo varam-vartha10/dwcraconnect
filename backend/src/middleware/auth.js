@@ -18,11 +18,21 @@ const protect = async (req, res, next) => {
   }
 
   try {
-    const decoded = jwt.verify(token, process.env.JWT_SECRET || "fallback_secret");
+    if (!process.env.JWT_SECRET) {
+      console.error("CRITICAL: JWT_SECRET environment variable is not set.");
+      return res.status(500).json({
+        success: false,
+        message: "Internal server error. Authentication service is misconfigured.",
+      });
+    }
+
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
     req.user = decoded;
     next();
   } catch (error) {
-    console.error("JWT Verify error:", error.message);
+    if (process.env.NODE_ENV !== "production") {
+      console.error("JWT Verify error:", error.message);
+    }
     return res.status(401).json({
       success: false,
       message: "Not authorized to access this route",

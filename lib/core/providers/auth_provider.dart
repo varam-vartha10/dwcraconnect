@@ -38,6 +38,8 @@ class AuthNotifier extends StateNotifier<AuthState> {
     _init();
   }
 
+  static const String _userPhoneKey = 'logged_in_user_phone';
+
   Future<void> _init() async {
     final prefs = await SharedPreferences.getInstance();
     final token = prefs.getString('auth_token');
@@ -47,6 +49,10 @@ class AuthNotifier extends StateNotifier<AuthState> {
       if (user != null) {
         state = state.copyWith(user: user, isInitialized: true);
         return;
+      } else {
+        // Token might be invalid/expired, clear it
+        await prefs.remove('auth_token');
+        await prefs.remove(_userPhoneKey);
       }
     }
     state = state.copyWith(isInitialized: true);
@@ -57,6 +63,9 @@ class AuthNotifier extends StateNotifier<AuthState> {
 
     try {
       final user = await UserRepository.login(phoneNumber, password);
+
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(_userPhoneKey, user.phoneNumber);
 
       state = AuthState(
         user: user,
@@ -80,8 +89,52 @@ class AuthNotifier extends StateNotifier<AuthState> {
     }
   }
 
+  Future<void> updateProfile({
+    String? name,
+    String? phoneNumber,
+    String? village,
+    String? aadhaar,
+  }) async {
+    state = state.copyWith(isLoading: true, errorMessage: null);
+    try {
+      final updatedUser = await UserRepository.updateProfile(
+        name: name,
+        phoneNumber: phoneNumber,
+        village: village,
+        aadhaar: aadhaar,
+      );
+      state = state.copyWith(user: updatedUser, isLoading: false);
+    } catch (e) {
+      state = state.copyWith(
+        isLoading: false, 
+        errorMessage: e.toString().replaceFirst('Exception: ', '')
+      );
+    }
+  }
+
+  Future<bool> changePassword(String currentPassword, String newPassword) async {
+    state = state.copyWith(isLoading: true, errorMessage: null);
+    try {
+      await UserRepository.changePassword(
+        currentPassword: currentPassword, 
+        newPassword: newPassword
+      );
+      state = state.copyWith(isLoading: false);
+      return true;
+    } catch (e) {
+      state = state.copyWith(
+        isLoading: false, 
+        errorMessage: e.toString().replaceFirst('Exception: ', '')
+      );
+      return false;
+    }
+  }
+
   Future<void> logout() async {
     await UserRepository.logout();
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove(_userPhoneKey);
+
     state = AuthState(isInitialized: true);
     _ref.read(leaderBottomNavIndexProvider.notifier).state = 0;
     _ref.read(memberBottomNavIndexProvider.notifier).state = 0;
