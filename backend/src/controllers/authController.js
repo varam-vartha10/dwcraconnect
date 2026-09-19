@@ -4,12 +4,7 @@ const User = require("../models/User");
 
 const login = async (req, res) => {
   try {
-    let { phoneNumber, password } = req.body;
-
-    // 1. Diagnostics (Safe logs for development)
-    if (process.env.NODE_ENV !== "production") {
-      console.log(`[Auth] Login attempt for phone: ${phoneNumber}`);
-    }
+    const { phoneNumber, password } = req.body;
 
     if (!phoneNumber || !password) {
       return res.status(400).json({
@@ -18,69 +13,55 @@ const login = async (req, res) => {
       });
     }
 
-    phoneNumber = String(phoneNumber).trim();
+    // Normalize input
+    const normalizedPhone = String(phoneNumber).trim();
 
+    // 1. Find the active user
     const user = await User.findOne({
-      $or: [
-        { phoneNumber: phoneNumber },
-        { mobile: phoneNumber }
-      ],
+      phoneNumber: normalizedPhone,
       isActive: true,
     });
 
     if (!user) {
-      if (process.env.NODE_ENV !== "production") {
-        console.log(`[Auth] Login failed: User not found or inactive (${phoneNumber})`);
-      }
+      // For security, we return the same generic error
       return res.status(401).json({
         success: false,
         message: "Invalid phone number or password",
       });
     }
 
-    const isHashed = user.password.startsWith("$2a$") || user.password.startsWith("$2b$");
+    // 2. Verify password using bcryptjs
+    const isPasswordCorrect = await bcrypt.compare(password, user.password);
 
-    if (!isHashed) {
-      if (process.env.NODE_ENV !== "production") {
-        console.log(`[Auth] CRITICAL: Plain-text password detected for user ${user.userId}.`);
-      }
-      if (password !== user.password) {
-        return res.status(401).json({
-          success: false,
-          message: "Invalid phone number or password",
-        });
-      }
-    } else {
-      const passwordMatches = await bcrypt.compare(password, user.password);
-      if (!passwordMatches) {
-        if (process.env.NODE_ENV !== "production") {
-          console.log(`[Auth] Login failed: Password mismatch for ${user.userId}`);
-        }
-        return res.status(401).json({
-          success: false,
-          message: "Invalid phone number or password",
-        });
-      }
-    }
-
-    if (process.env.NODE_ENV !== "production") {
-      console.log(`[Auth] Login successful: ${user.userId}`);
-    }
-
-    if (!process.env.JWT_SECRET) {
-      console.error("CRITICAL: JWT_SECRET environment variable is not set.");
-      return res.status(500).json({
+    if (!isPasswordCorrect) {
+      return res.status(401).json({
         success: false,
-        message: "Internal server error. Authentication service is misconfigured.",
+        message: "Invalid phone number or password",
       });
     }
 
+    // 3. Check for JWT_SECRET
+    if (!process.env.JWT_SECRET) {
+      console.error("CRITICAL ERROR: JWT_SECRET is not defined in environment variables.");
+      return res.status(500).json({
+        success: false,
+        message: "Internal server error. Authentication misconfigured.",
+      });
+    }
+
+    // 4. Generate JWT
     const token = jwt.sign(
-      { id: user._id, userId: user.userId, role: user.role, groupId: user.groupId },
+      {
+        id: user._id,
+        userId: user.userId,
+        role: user.role,
+        groupId: user.groupId
+      },
       process.env.JWT_SECRET,
       { expiresIn: "30d" }
     );
 
+    // 5. Send successful response
     const safeUser = user.toObject();
     delete safeUser.password;
 
@@ -91,10 +72,10 @@ const login = async (req, res) => {
       user: safeUser,
     });
   } catch (error) {
-    console.error("[Auth] Login error:", error);
+    console.error("Login Error:", error.message);
     return res.status(500).json({
       success: false,
-      message: "An internal server error occurred",
+      message: "An unexpected error occurred during login",
     });
   }
 };
@@ -114,7 +95,7 @@ const getMe = async (req, res) => {
       user,
     });
   } catch (error) {
-    console.error("[Auth] GetMe error:", error);
+    console.error("GetProfile Error:", error.message);
     res.status(500).json({
       success: false,
       message: "Failed to fetch user profile",
@@ -151,7 +132,7 @@ const changePassword = async (req, res) => {
       message: "Password changed successfully",
     });
   } catch (error) {
-    console.error("Change password error:", error);
+    console.error("ChangePassword Error:", error.message);
     res.status(500).json({
       success: false,
       message: "Failed to change password",

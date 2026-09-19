@@ -7,8 +7,8 @@ class ApiService {
   // Development URL (Android Emulator)
   static const String devBaseUrl = 'http://10.0.2.2:5000/api';
   
-  // Production URL - Replace with your actual deployed domain
-  static const String prodBaseUrl = 'https://api.dwcraconnect.com/api';
+  // Production URL
+  static const String prodBaseUrl = 'https://dwcra-connect-backend.onrender.com/api';
 
   // Toggle this for production
   static const bool isProduction = false;
