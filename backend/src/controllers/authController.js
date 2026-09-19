@@ -7,6 +7,7 @@ const login = async (req, res) => {
     const { phoneNumber, password } = req.body;
 
     if (!phoneNumber || !password) {
+      console.log(`[Diagnostic] Missing fields. Keys present: ${Object.keys(req.body)}`);
       return res.status(400).json({
         success: false,
         message: "Phone number and password are required",
@@ -16,6 +17,11 @@ const login = async (req, res) => {
     // Normalize input
     const normalizedPhone = String(phoneNumber).trim();
 
+    // Debug DB connection (Safe)
+    const dbName = User.db.name;
+    const dbHost = User.db.host;
+    console.log(`[Diagnostic] Attempting login on DB: ${dbName} at ${dbHost.substring(0, 10)}...`);
+
     // 1. Find the active user
     const user = await User.findOne({
       phoneNumber: normalizedPhone,
@@ -23,22 +29,27 @@ const login = async (req, res) => {
     });
 
     if (!user) {
-      // For security, we return the same generic error
+      console.log(`[Diagnostic] User NOT found for phone: ${normalizedPhone}`);
       return res.status(401).json({
         success: false,
         message: "Invalid phone number or password",
       });
     }
+
+    console.log(`[Diagnostic] User found: ${user.userId} (${user.role})`);
 
     // 2. Verify password using bcryptjs
     const isPasswordCorrect = await bcrypt.compare(password, user.password);
 
     if (!isPasswordCorrect) {
+      console.log(`[Diagnostic] Password mismatch for user: ${user.userId}`);
       return res.status(401).json({
         success: false,
         message: "Invalid phone number or password",
       });
     }
+
+    console.log(`[Diagnostic] Password verified for user: ${user.userId}`);
 
     // 3. Check for JWT_SECRET
     if (!process.env.JWT_SECRET) {
