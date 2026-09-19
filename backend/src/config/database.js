@@ -6,6 +6,7 @@ const connectDatabase = async () => {
 
     await mongoose.connect(process.env.MONGO_URI, {
       serverSelectionTimeoutMS: 10000,
+      dbName: 'dwcra_connect', // Explicitly force the database name
     });
 
     console.log("MongoDB connected successfully");

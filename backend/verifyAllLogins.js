@@ -20,7 +20,7 @@ async function verifyAll() {
 
   try {
     console.log("Connecting to MongoDB Atlas...");
-    await mongoose.connect(process.env.MONGO_URI);
+    await mongoose.connect(process.env.MONGO_URI, { dbName: "dwcra_connect" });
     console.log("Connected.");
 
     const groupId = "GRP001";

@@ -10,7 +10,7 @@ const User = require("./src/models/User");
 async function reset() {
   try {
     console.log("Connecting to MongoDB Atlas...");
-    await mongoose.connect(process.env.MONGO_URI);
+    await mongoose.connect(process.env.MONGO_URI, { dbName: "dwcra_connect" });
     console.log("Connected.");
 
     const userId = "SHG-001";
