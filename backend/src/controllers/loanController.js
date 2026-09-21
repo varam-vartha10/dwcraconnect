@@ -5,22 +5,18 @@ const { generateEmiSchedule } = require("../utils/emiSchedule");
 
 const getLoans = async (req, res) => {
   try {
-    const { groupId, memberId } = req.query;
+    const { memberId } = req.query;
     const { role, groupId: userGroupId, userId } = req.user;
 
-    const filter = {};
+    const filter = { groupId: userGroupId };
 
-    // Enforce Group Access
-    filter.groupId = userGroupId;
-
-    // Enforce Member Access
     if (role === "member") {
       filter.memberId = userId;
-    } else if (role === "leader") {
-      if (memberId) filter.memberId = memberId;
+    } else if (role === "leader" && memberId) {
+      filter.memberId = memberId;
     }
 
-    const loans = await Loan.find(filter).sort({ createdAt: -1 });
+    const loans = await Loan.find(filter).sort({ createdAt: -1 }).lean();
 
     res.status(200).json({
       success: true,
@@ -39,100 +35,40 @@ const getLoans = async (req, res) => {
 const createLoan = async (req, res) => {
   try {
     const {
-      loanId,
-      memberId,
-      groupId,
-      loanType,
-      purpose,
-      principalAmount,
-      interestRate,
-      tenureMonths,
-      startDate,
+      loanId, memberId, groupId, loanType, purpose,
+      principalAmount, interestRate, tenureMonths, startDate,
     } = req.body;
 
     const { role, groupId: userGroupId } = req.user;
 
-    // Only leaders can create loans
     if (role !== "leader") {
-      return res.status(403).json({
-        success: false,
-        message: "Only group leaders can initiate loans",
-      });
+      return res.status(403).json({ success: false, message: "Only leaders can initiate loans" });
     }
 
-    // Ensure loan is within the leader's group
     if (groupId !== userGroupId) {
-      return res.status(403).json({
-        success: false,
-        message: "Cannot create loan for another group",
-      });
-    }
-
-    if (!loanId || !memberId || !groupId || !purpose || principalAmount === undefined || interestRate === undefined || !tenureMonths || !startDate) {
-      return res.status(400).json({
-        success: false,
-        message: "Required loan fields are missing",
-      });
-    }
-
-    const existingLoan = await Loan.findOne({ loanId });
-    if (existingLoan) {
-      return res.status(409).json({
-        success: false,
-        message: "Loan ID already exists",
-      });
+      return res.status(403).json({ success: false, message: "Cannot create loan for another group" });
     }
 
     const monthlyEmi = calculateMonthlyEmi(Number(principalAmount), Number(interestRate), Number(tenureMonths));
 
     const loan = await Loan.create({
-      loanId,
-      memberId,
-      groupId,
-      loanType: loanType || "SHG Bank Linkage",
-      purpose,
-      principalAmount: Number(principalAmount),
-      interestRate: Number(interestRate),
-      tenureMonths: Number(tenureMonths),
-      startDate,
-      status: "active",
+      loanId, memberId, groupId, loanType: loanType || "SHG Bank Linkage",
+      purpose, principalAmount: Number(principalAmount), interestRate: Number(interestRate),
+      tenureMonths: Number(tenureMonths), startDate, status: "active",
     });
 
     const emiSchedule = generateEmiSchedule({
-      loanId,
-      memberId,
-      groupId,
-      principalAmount: Number(principalAmount),
-      interestRate: Number(interestRate),
-      tenureMonths: Number(tenureMonths),
-      startDate,
-      monthlyEmi,
+      loanId, memberId, groupId, principalAmount: Number(principalAmount),
+      interestRate: Number(interestRate), tenureMonths: Number(tenureMonths),
+      startDate, monthlyEmi,
     });
 
     await Emi.insertMany(emiSchedule);
 
-    res.status(201).json({
-      success: true,
-      message: "Loan and EMI schedule created successfully",
-      loan,
-      emiSummary: {
-        monthlyEmi,
-        totalEmis: tenureMonths,
-        firstDueDate: emiSchedule[0].dueDate,
-        lastDueDate: emiSchedule[emiSchedule.length - 1].dueDate,
-      },
-    });
+    res.status(201).json({ success: true, message: "Loan created", loan });
   } catch (error) {
-    console.error("Create loan error:", error);
-    res.status(500).json({
-      success: false,
-      message: "Failed to create loan",
-      error: error.message,
-    });
+    res.status(500).json({ success: false, message: "Failed to create loan" });
   }
 };
 
-module.exports = {
-  getLoans,
-  createLoan,
-};
+module.exports = { getLoans, createLoan };

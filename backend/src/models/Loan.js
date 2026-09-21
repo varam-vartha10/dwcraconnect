@@ -7,6 +7,7 @@ const loanSchema = new mongoose.Schema(
       required: true,
       unique: true,
       trim: true,
+      index: true,
     },
 
     memberId: {
@@ -67,6 +68,7 @@ const loanSchema = new mongoose.Schema(
         "cancelled"
       ],
       default: "pending",
+      index: true,
     },
   },
   {

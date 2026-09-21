@@ -7,6 +7,7 @@ const subsidySchema = new mongoose.Schema(
       required: true,
       unique: true,
       trim: true,
+      index: true,
     },
 
     memberId: {
@@ -37,6 +38,7 @@ const subsidySchema = new mongoose.Schema(
       type: String,
       enum: ["pending", "received", "disbursed"],
       default: "pending",
+      index: true,
     },
 
     dateReceived: {

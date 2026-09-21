@@ -7,7 +7,6 @@ const login = async (req, res) => {
     const { phoneNumber, password } = req.body;
 
     if (!phoneNumber || !password) {
-      console.log(`[Diagnostic] Missing fields. Keys present: ${Object.keys(req.body)}`);
       return res.status(400).json({
         success: false,
         message: "Phone number and password are required",
@@ -17,46 +16,44 @@ const login = async (req, res) => {
     // Normalize input
     const normalizedPhone = String(phoneNumber).trim();
 
-    // Debug DB connection (Safe)
+    // Debug DB connection
     const dbName = User.db.name;
-    const dbHost = User.db.host;
-    console.log(`[Diagnostic] Attempting login on DB: ${dbName} at ${dbHost.substring(0, 10)}...`);
+    console.log(`[Auth] Login attempt for: ${normalizedPhone} on DB: ${dbName}`);
 
-    // 1. Find the active user
+    // 1. Find the active user (Check both phoneNumber and legacy mobile field)
     const user = await User.findOne({
-      phoneNumber: normalizedPhone,
+      $or: [
+        { phoneNumber: normalizedPhone },
+        { mobile: normalizedPhone }
+      ],
       isActive: true,
     });
 
     if (!user) {
-      console.log(`[Diagnostic] User NOT found for phone: ${normalizedPhone}`);
+      console.log(`[Auth] User not found: ${normalizedPhone}`);
       return res.status(401).json({
         success: false,
         message: "Invalid phone number or password",
       });
     }
-
-    console.log(`[Diagnostic] User found: ${user.userId} (${user.role})`);
 
     // 2. Verify password using bcryptjs
     const isPasswordCorrect = await bcrypt.compare(password, user.password);
 
     if (!isPasswordCorrect) {
-      console.log(`[Diagnostic] Password mismatch for user: ${user.userId}`);
+      console.log(`[Auth] Password mismatch for: ${user.userId}`);
       return res.status(401).json({
         success: false,
         message: "Invalid phone number or password",
       });
     }
 
-    console.log(`[Diagnostic] Password verified for user: ${user.userId}`);
-
     // 3. Check for JWT_SECRET
     if (!process.env.JWT_SECRET) {
-      console.error("CRITICAL ERROR: JWT_SECRET is not defined in environment variables.");
+      console.error("CRITICAL: JWT_SECRET missing");
       return res.status(500).json({
         success: false,
-        message: "Internal server error. Authentication misconfigured.",
+        message: "Authentication service misconfigured",
       });
     }
 
@@ -86,7 +83,7 @@ const login = async (req, res) => {
     console.error("Login Error:", error.message);
     return res.status(500).json({
       success: false,
-      message: "An unexpected error occurred during login",
+      message: "An internal server error occurred",
     });
   }
 };
@@ -106,7 +103,6 @@ const getMe = async (req, res) => {
       user,
     });
   } catch (error) {
-    console.error("GetProfile Error:", error.message);
     res.status(500).json({
       success: false,
       message: "Failed to fetch user profile",
@@ -143,7 +139,6 @@ const changePassword = async (req, res) => {
       message: "Password changed successfully",
     });
   } catch (error) {
-    console.error("ChangePassword Error:", error.message);
     res.status(500).json({
       success: false,
       message: "Failed to change password",

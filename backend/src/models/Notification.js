@@ -7,6 +7,7 @@ const notificationSchema = new mongoose.Schema(
       required: true,
       unique: true,
       trim: true,
+      index: true,
     },
 
     memberId: {
@@ -44,11 +45,13 @@ const notificationSchema = new mongoose.Schema(
         "other"
       ],
       default: "other",
+      index: true,
     },
 
     isRead: {
       type: Boolean,
       default: false,
+      index: true,
     },
 
     relatedId: {

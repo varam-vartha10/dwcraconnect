@@ -7,12 +7,14 @@ const userSchema = new mongoose.Schema(
       required: true,
       unique: true,
       trim: true,
+      index: true,
     },
 
     groupId: {
       type: String,
       required: true,
       trim: true,
+      index: true,
     },
 
     name: {
@@ -26,6 +28,7 @@ const userSchema = new mongoose.Schema(
       required: true,
       unique: true,
       trim: true,
+      index: true,
     },
 
     password: {

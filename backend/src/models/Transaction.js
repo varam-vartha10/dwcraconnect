@@ -7,6 +7,7 @@ const transactionSchema = new mongoose.Schema(
       required: true,
       unique: true,
       trim: true,
+      index: true,
     },
 
     loanId: {
@@ -49,17 +50,20 @@ const transactionSchema = new mongoose.Schema(
         "other"
       ],
       required: true,
+      index: true,
     },
 
     status: {
       type: String,
       enum: ["pending", "completed", "failed", "cancelled"],
       default: "pending",
+      index: true,
     },
 
     paymentDate: {
       type: Date,
       default: Date.now,
+      index: true,
     },
 
     notes: {

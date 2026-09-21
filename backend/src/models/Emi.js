@@ -7,6 +7,7 @@ const emiSchema = new mongoose.Schema(
       required: true,
       unique: true,
       trim: true,
+      index: true,
     },
 
     loanId: {
@@ -42,12 +43,14 @@ const emiSchema = new mongoose.Schema(
     dueDate: {
       type: Date,
       required: true,
+      index: true,
     },
 
     status: {
       type: String,
       enum: ["pending", "paid", "overdue", "waived"],
       default: "pending",
+      index: true,
     },
 
     paidDate: {
