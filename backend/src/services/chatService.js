@@ -7,7 +7,6 @@ const Subsidy = require("../models/Subsidy");
 const Notification = require("../models/Notification");
 
 const ACTIVE_LOAN_STATUSES = ["pending", "active", "overdue"];
-const GROUP_LEADER_POSITIONS = new Set(["president", "secretary"]);
 
 class ChatServiceError extends Error {
   constructor(statusCode, message) {
@@ -17,8 +16,18 @@ class ChatServiceError extends Error {
   }
 }
 
-const formatDate = (value) => (value ? new Date(value).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : null);
-const roundAmount = (value) => Math.round((Number(value) || 0) * 100) / 100;
+const formatDate = (value) => {
+  if (!value) return null;
+  try {
+    return new Date(value).toLocaleDateString('en-IN', {
+      day: '2-digit',
+      month: 'short',
+      year: 'numeric',
+    });
+  } catch (_) {
+    return String(value);
+  }
+};
 
 const detectLanguage = (message) => {
   const hasTelugu = /[\u0C00-\u0C7F]/.test(message);
@@ -28,36 +37,143 @@ const detectLanguage = (message) => {
   return "en";
 };
 
-const hasAny = (message, expressions) => expressions.some((expression) => expression.test(message));
+const hasAny = (text, patterns) => {
+  return patterns.some((pattern) => {
+    if (pattern instanceof RegExp) {
+      return pattern.test(text);
+    }
+    return text.includes(pattern);
+  });
+};
 
 const detectIntent = (message) => {
-  const text = message.toLowerCase();
+  const text = message
+    .toLowerCase()
+    .trim()
+    .replace(/[.,?!;:()"'']/g, "")
+    .replace(/\s+/g, " ");
 
-  // 1. Loan Intents
-  if (hasAny(text, [/\btotal loan\b/, /మొత్తం రుణం/, /total loan/])) return "loan_total";
-  if (hasAny(text, [/\b(loan (left|remaining|balance))\b/, /\b(how much.*pay)\b/, /రుణం.*మిగిలి/, /loan entha/])) return "loan_balance";
-  if (hasAny(text, [/\bactive loans\b/, /ప్రస్తుత రుణాలు/, /active loans/])) return "active_loans";
+  // 1. Loan Balance / Remaining (check specific 'left/remaining/balance' first)
+  if (hasAny(text, [
+    /loan (left|remaining|balance)/,
+    /how much.*loan.*(left|remaining|balance|pay)/,
+    /how much.*pay/,
+    /remaining loan/,
+    /balance entha/,
+    /inka entha loan/,
+    /రుణం.*మిగిలి/
+  ])) return "loan_balance";
 
-  // 2. EMI Intents
-  if (hasAny(text, [/\bnext emi\b/, /తదుపరి ఈఎంఐ/, /next emi/])) return "next_emi";
-  if (hasAny(text, [/\bemi amount\b/, /ఈఎంఐ మొత్తం/, /emi entha/])) return "emi_amount";
-  if (hasAny(text, [/\bemi (due|date)\b/, /గడువు తేదీ/, /emi eppudu/])) return "emi_due_date";
+  // 2. Loan Total
+  if (hasAny(text, [
+    /\btotal loan\b/,
+    /\bloan amount\b/,
+    /how much.*loan/,
+    /my loan amount/,
+    /మొత్తం రుణం/,
+    /loan entha/,
+    /naa total loan/,
+    /naa loan entha/,
+    /naaku entha loan/
+  ])) return "loan_total";
 
-  // 3. Financial Logs
-  if (hasAny(text, [/\b(transactions?|payments?)\b/, /లావాదేవీలు/, /payment history/])) return "transactions";
-  if (hasAny(text, [/\bsubsid(y|ies)\b/, /సబ్సిడీ/, /subsidies/])) return "subsidies";
-  if (hasAny(text, [/\bnotifications\b/, /నోటిఫికేషన్లు/, /alerts/])) return "notifications";
+  // 3. Active Loans
+  if (hasAny(text, [
+    /active loan/,
+    /my loans/,
+    /show.*loans/,
+    /ప్రస్తుత రుణాలు/
+  ])) return "active_loans";
 
-  // 4. Account
-  if (hasAny(text, [/\bprofile\b/, /ప్రొఫైల్/, /my details/])) return "profile";
-  if (hasAny(text, [/\bgroup id\b/, /గ్రూప్ ఐడి/, /group id/])) return "group_id";
+  // 4. Next EMI / EMI Due Date
+  if (hasAny(text, [
+    /next emi/,
+    /emi (due|date|when)/,
+    /when is my emi/,
+    /when is emi due/,
+    /తదుపరి ఈఎంఐ/,
+    /గడువు తేదీ/,
+    /emi eppudu/,
+    /next installment/
+  ])) return "next_emi";
+
+  // 5. EMI Amount
+  if (hasAny(text, [
+    /how much.*emi/,
+    /emi amount/,
+    /ఈఎంఐ మొత్తం/,
+    /emi entha/,
+    /my emi amount/
+  ])) return "emi_amount";
+
+  // 6. EMI Details
+  if (hasAny(text, [
+    /emi detail/,
+    /show emi/
+  ])) return "emi_details";
+
+  // 7. Transactions / Payment History
+  if (hasAny(text, [
+    /transaction/,
+    /payment history/,
+    /show.*transaction/,
+    /show.*payment/,
+    /recent payment/,
+    /లావాదేవీలు/,
+    /naa transactions/
+  ])) return "transactions";
+
+  // 8. Subsidies
+  if (hasAny(text, [
+    /subsid(y|ies)/,
+    /సబ్సిడీ/,
+    /show.*subsid/
+  ])) return "subsidies";
+
+  // 9. Notifications
+  if (hasAny(text, [
+    /notification/,
+    /alert/,
+    /reminder/,
+    /నోటిఫికేషన్లు/,
+    /show.*notification/
+  ])) return "notifications";
+
+  // 10. Profile
+  if (hasAny(text, [
+    /profile/,
+    /my detail/,
+    /naa profile/,
+    /naa detail/,
+    /ప్రొఫైల్/
+  ])) return "profile";
+
+  // 11. Group ID
+  if (hasAny(text, [
+    /group id/,
+    /group number/,
+    /గ్రూప్ ఐడి/
+  ])) return "group_id";
+
+  // 12. Greetings
+  if (hasAny(text, [
+    /\bhi\b/,
+    /\bhello\b/,
+    /\bhey\b/,
+    /నమస్తే/
+  ])) return "greeting";
 
   return "unknown";
 };
 
 const getAuthenticatedUser = async (authenticatedUser) => {
-  const user = await User.findById(authenticatedUser.id).select("userId groupId name role position isActive").lean();
-  if (!user || !user.isActive) throw new ChatServiceError(401, "Unauthorized access.");
+  const user = await User.findById(authenticatedUser.id)
+    .select("userId groupId name role position isActive village aadhaar phoneNumber")
+    .lean();
+
+  if (!user || !user.isActive) {
+    throw new ChatServiceError(401, "Unauthorized access.");
+  }
   return user;
 };
 
@@ -66,25 +182,31 @@ const fetchDataForIntent = async (intent, user) => {
   switch (intent) {
     case "loan_total":
     case "loan_balance":
-    case "active_loans":
+    case "active_loans": {
       const loans = await Loan.find({ memberId: user.userId, status: { $in: ACTIVE_LOAN_STATUSES } }).lean();
       const txs = await Transaction.find({ memberId: user.userId, type: "loan_payment", status: "completed" }).lean();
-      const totalPaid = txs.reduce((sum, t) => sum + t.amount, 0);
+      const totalPaid = txs.reduce((sum, t) => sum + (t.amount || 0), 0);
       return { loans, totalPaid };
+    }
 
     case "next_emi":
     case "emi_amount":
     case "emi_due_date":
+    case "emi_details": {
       return await Emi.findOne({ memberId: user.userId, status: { $in: ["pending", "overdue"] } }).sort({ dueDate: 1 }).lean();
+    }
 
-    case "transactions":
+    case "transactions": {
       return await Transaction.find({ memberId: user.userId }).sort({ paymentDate: -1 }).limit(5).lean();
+    }
 
-    case "subsidies":
+    case "subsidies": {
       return await Subsidy.find({ memberId: user.userId }).sort({ createdAt: -1 }).limit(5).lean();
+    }
 
-    case "notifications":
+    case "notifications": {
       return await Notification.find({ memberId: user.userId }).sort({ createdAt: -1 }).limit(5).lean();
+    }
 
     case "profile":
     case "group_id":
@@ -95,48 +217,119 @@ const fetchDataForIntent = async (intent, user) => {
   }
 };
 
-const constructResponse = (intent, data, language) => {
+const constructResponse = (intent, data, language, user) => {
   const isTelugu = language === "te" || language === "te-en";
 
-  if (!data && ["next_emi", "emi_amount", "emi_due_date"].includes(intent)) {
-    return isTelugu ? "మీకు ప్రస్తుతం పెండింగ్ ఈఎంఐలు లేవు." : "You don't have any pending EMIs at the moment.";
+  if (intent === "greeting") {
+    return isTelugu
+      ? "నమస్తే! నేను మీకు మీ రుణం, ఈఎంఐ, లావాదేవీలు మరియు ప్రొఫైల్ వివరాల గురించి సహాయం చేయగలను."
+      : "Hello! I am your DWCRA assistant. I can help you with questions about your loans, EMIs, transactions, subsidies, notifications, and profile.";
+  }
+
+  if (["next_emi", "emi_amount", "emi_due_date", "emi_details"].includes(intent)) {
+    if (!data) {
+      return isTelugu ? "మీకు ప్రస్తుతం పెండింగ్ ఈఎంఐలు లేవు." : "You don't have any pending EMIs at the moment.";
+    }
+  }
+
+  if (["loan_total", "loan_balance", "active_loans"].includes(intent)) {
+    if (!data || !data.loans || data.loans.length === 0) {
+      return isTelugu ? "మీకు ఎటువంటి క్రియాశీల రుణాలు లేవు." : "You don't have any active loans.";
+    }
   }
 
   switch (intent) {
-    case "loan_total":
-      const total = data.loans.reduce((sum, l) => sum + l.principalAmount, 0);
-      return isTelugu ? `మీ మొత్తం రుణ మొత్తం ₹${total.toLocaleString('en-IN')}.` : `Your total loan amount is ₹${total.toLocaleString('en-IN')}.`;
+    case "loan_total": {
+      const total = data.loans.reduce((sum, l) => sum + (l.principalAmount || 0), 0);
+      return isTelugu
+        ? `మీ మొత్తం రుణ మొత్తం ₹${total.toLocaleString('en-IN')}.`
+        : `Your total loan amount is ₹${total.toLocaleString('en-IN')}.`;
+    }
 
-    case "loan_balance":
-      const principal = data.loans.reduce((sum, l) => sum + l.principalAmount, 0);
-      const balance = principal - data.totalPaid;
-      return isTelugu ? `మీ మిగిలిన రుణ బకాయి ₹${balance.toLocaleString('en-IN')}.` : `Your remaining loan balance is ₹${balance.toLocaleString('en-IN')}.`;
+    case "loan_balance": {
+      const principal = data.loans.reduce((sum, l) => sum + (l.principalAmount || 0), 0);
+      const balance = Math.max(0, principal - data.totalPaid);
+      return isTelugu
+        ? `మీ మిగిలిన రుణ బకాయి ₹${balance.toLocaleString('en-IN')}.`
+        : `Your remaining loan balance is ₹${balance.toLocaleString('en-IN')}.`;
+    }
+
+    case "active_loans": {
+      const loanCount = data.loans.length;
+      const loanDetails = data.loans
+        .map(l => `${l.loanType || 'Loan'}: ₹${(l.principalAmount || 0).toLocaleString('en-IN')} (${l.status})`)
+        .join("\n");
+      return (isTelugu ? `మీకు ${loanCount} క్రియాశీల రుణాలు ఉన్నాయి:\n` : `You have ${loanCount} active loan(s):\n`) + loanDetails;
+    }
 
     case "next_emi":
-      return isTelugu ? `మీ తదుపరి ఈఎంఐ ₹${data.amount.toLocaleString('en-IN')}, గడువు తేదీ ${formatDate(data.dueDate)}.` : `Your next EMI is ₹${data.amount.toLocaleString('en-IN')}, due on ${formatDate(data.dueDate)}.`;
+    case "emi_due_date":
+    case "emi_details": {
+      const amount = data.amount || 0;
+      const due = formatDate(data.dueDate);
+      return isTelugu
+        ? `మీ తదుపరి ఈఎంఐ ₹${amount.toLocaleString('en-IN')}, గడువు తేదీ ${due}.`
+        : `Your next EMI is ₹${amount.toLocaleString('en-IN')}, due on ${due}.`;
+    }
 
-    case "transactions":
-      if (data.length === 0) return isTelugu ? "లావాదేవీలు ఏవీ లేవు." : "No recent transactions found.";
-      const txList = data.map(t => `${formatDate(t.paymentDate)}: ₹${t.amount} (${t.type})`).join("\n");
+    case "emi_amount": {
+      const amount = data.amount || 0;
+      return isTelugu
+        ? `మీ ఈఎంఐ మొత్తం ₹${amount.toLocaleString('en-IN')}.`
+        : `Your EMI amount is ₹${amount.toLocaleString('en-IN')}.`;
+    }
+
+    case "transactions": {
+      if (!data || data.length === 0) {
+        return isTelugu ? "ఇటీవలి లావాదేవీలు ఏవీ లేవు." : "No recent transactions found.";
+      }
+      const txList = data
+        .map(t => `${formatDate(t.paymentDate || t.createdAt)}: ₹${t.amount} (${t.type || 'payment'})`)
+        .join("\n");
       return (isTelugu ? "ఇటీవలి లావాదేవీలు:\n" : "Recent transactions:\n") + txList;
+    }
 
-    case "profile":
-      return isTelugu ? `పేరు: ${data.name}\nID: ${data.userId}\nగ్రూప్: ${data.groupId}` : `Name: ${data.name}\nID: ${data.userId}\nGroup: ${data.groupId}`;
+    case "subsidies": {
+      if (!data || data.length === 0) {
+        return isTelugu ? "సబ్సిడీలు ఏవీ లేవు." : "No subsidies found.";
+      }
+      const subList = data
+        .map(s => `${s.schemeName || 'Subsidy'}: ₹${s.amount} (${s.status})`)
+        .join("\n");
+      return (isTelugu ? "మీ సబ్సిడీ వివరాలు:\n" : "Your subsidy details:\n") + subList;
+    }
 
-    case "group_id":
-      return isTelugu ? `మీ గ్రూప్ ఐడి ${data.groupId}.` : `Your Group ID is ${data.groupId}.`;
+    case "notifications": {
+      if (!data || data.length === 0) {
+        return isTelugu ? "నోటిఫికేషన్లు ఏవీ లేవు." : "No notifications found.";
+      }
+      const notifList = data.map(n => `- ${n.title}`).join("\n");
+      return (isTelugu ? "ఇటీవలి నోటిఫికేషన్లు:\n" : "Recent notifications:\n") + notifList;
+    }
+
+    case "profile": {
+      return isTelugu
+        ? `పేరు: ${data.name}\nID: ${data.userId}\nగ్రూప్: ${data.groupId}`
+        : `Name: ${data.name}\nID: ${data.userId}\nGroup: ${data.groupId}`;
+    }
+
+    case "group_id": {
+      return isTelugu
+        ? `మీ గ్రూప్ ఐడి ${data.groupId}.`
+        : `Your Group ID is ${data.groupId}.`;
+    }
 
     default:
-      return isTelugu ? "క్షమించండి, నేను సహాయం చేయగలను: రుణం, ఈఎంఐ, లావాదేవీలు మరియు ప్రొఫైల్ గురించి అడగండి." : "I can help you with questions about your loan, EMI, transactions, and profile. Please try asking about one of these.";
+      return isTelugu
+        ? "నేను మీకు మీ రుణం, ఈఎంఐ, లావాదేవీలు, సబ్సిడీలు, నోటిఫికేషన్లు మరియు ప్రొఫైల్ వివరాల గురించి సహాయం చేయగలను."
+        : "I can help you with your loan, EMI, transactions, subsidies, notifications and profile.";
   }
 };
 
 const createAiReply = async (message, userContext) => {
-  if (!process.env.OPENAI_API_KEY) {
-    return null; // Fallback to local unknown message
-  }
-  const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+  if (!process.env.OPENAI_API_KEY) return null;
   try {
+    const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
     const response = await client.chat.completions.create({
       model: "gpt-4o-mini",
       messages: [
@@ -147,39 +340,46 @@ const createAiReply = async (message, userContext) => {
     });
     return response.choices[0].message.content.trim();
   } catch (error) {
-    console.error("AI provider failure:", error.message);
+    if (process.env.NODE_ENV !== "production") {
+      console.error("[Chat] Optional AI service provider error:", error.message);
+    }
     return null;
   }
 };
 
 const processChatMessage = async ({ authenticatedUser, message }) => {
-  const user = await getAuthenticatedUser(authenticatedUser);
-  const language = detectLanguage(message);
-  const intent = detectIntent(message);
+  try {
+    const user = await getAuthenticatedUser(authenticatedUser);
+    const language = detectLanguage(message);
+    const intent = detectIntent(message);
 
-  if (intent !== "unknown") {
-    const data = await fetchDataForIntent(intent, user);
+    if (intent !== "unknown") {
+      const data = await fetchDataForIntent(intent, user);
+      return {
+        reply: constructResponse(intent, data, language, user),
+        language,
+        intent,
+        dataSource: "database"
+      };
+    }
+
+    // Optional AI fallback for non-account general questions
+    const aiReply = await createAiReply(message, { name: user.name, role: user.role });
+    if (aiReply) {
+      return { reply: aiReply, language, intent: "ai_fallback", dataSource: "ai" };
+    }
+
+    // Standard friendly fallback response when query is unrecognized and no AI key configured
     return {
-      reply: constructResponse(intent, data, language),
+      reply: constructResponse("unknown", null, language, user),
       language,
-      intent,
-      dataSource: "database"
+      intent: "unknown",
+      dataSource: "none"
     };
+  } catch (error) {
+    if (error instanceof ChatServiceError) throw error;
+    throw new ChatServiceError(500, "Unable to process your request right now.");
   }
-
-  // Fallback to AI if configured
-  const aiReply = await createAiReply(message, { name: user.name, role: user.role });
-  if (aiReply) {
-    return { reply: aiReply, language, intent: "ai_fallback", dataSource: "ai" };
-  }
-
-  // Final fallback
-  return {
-    reply: constructResponse("unknown", null, language),
-    language,
-    intent: "unknown",
-    dataSource: "none"
-  };
 };
 
 module.exports = { processChatMessage, ChatServiceError };
