@@ -185,7 +185,12 @@ const fetchDataForIntent = async (intent, user) => {
     case "active_loans": {
       const loans = await Loan.find({ memberId: user.userId, status: { $in: ACTIVE_LOAN_STATUSES } }).lean();
       const txs = await Transaction.find({ memberId: user.userId, type: "loan_payment", status: "completed" }).lean();
-      const totalPaid = txs.reduce((sum, t) => sum + (t.amount || 0), 0);
+      const paidEmis = await Emi.find({ memberId: user.userId, status: "paid" }).lean();
+
+      const totalTxPaid = txs.reduce((sum, t) => sum + (t.amount || 0), 0);
+      const totalEmiPaid = paidEmis.reduce((sum, e) => sum + (e.amount || 0), 0);
+      const totalPaid = Math.max(totalTxPaid, totalEmiPaid);
+
       return { loans, totalPaid };
     }
 
