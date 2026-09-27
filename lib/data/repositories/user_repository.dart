@@ -8,14 +8,19 @@ class UserRepository {
     String phoneNumber,
     String password,
   ) async {
+    // 1. Safe normalization: Trim and remove common artifacts, but don't be over-restrictive
+    final cleanPhone = phoneNumber.trim();
+
+    // 2. Call the API
     final response = await ApiService.post(
       '/auth/login',
       {
-        'phoneNumber': phoneNumber.trim(),
+        'phoneNumber': cleanPhone,
         'password': password,
       },
     );
 
+    // 3. Verify response
     if (response['success'] != true || response['user'] == null) {
       throw Exception(response['message'] ?? 'Login failed');
     }
@@ -23,9 +28,13 @@ class UserRepository {
     final userData = Map<String, dynamic>.from(response['user']);
     final token = response['token'];
 
+    // 4. Persistence
     if (token != null) {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString('auth_token', token);
+      
+      // Cache in-memory token to speed up subsequent requests
+      ApiService.setToken(token);
     }
 
     return _mapToEntity(userData);
@@ -81,6 +90,7 @@ class UserRepository {
   static Future<void> logout() async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove('auth_token');
+    await ApiService.clearCache();
   }
 
   static UserEntity _mapToEntity(Map<String, dynamic> data) {
@@ -91,6 +101,8 @@ class UserRepository {
       phoneNumber: data['phoneNumber'] ?? '',
       role: _parseRole(data['role']),
       position: _parsePosition(data['position']),
+      village: data['village'],
+      aadhaar: data['aadhaar'],
     );
   }
 

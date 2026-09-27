@@ -25,15 +25,8 @@ class _SubsidyRecordsScreenState extends ConsumerState<SubsidyRecordsScreen> {
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
-    final subsidies = ref.watch(subsidiesProvider);
+    final subsidiesAsync = ref.watch(subsidiesProvider);
     
-    final filteredSubsidies = subsidies.where((s) {
-      final matchesSearch = s.memberName.toLowerCase().contains(_searchController.text.toLowerCase()) ||
-                          s.schemeName.toLowerCase().contains(_searchController.text.toLowerCase());
-      final matchesFilter = _selectedFilter == 'All' || s.schemeName == _selectedFilter;
-      return matchesSearch && matchesFilter;
-    }).toList();
-
     return Scaffold(
       appBar: AppBar(
         title: Text(l10n.subsidyRecords),
@@ -82,40 +75,57 @@ class _SubsidyRecordsScreenState extends ConsumerState<SubsidyRecordsScreen> {
             ),
           ),
           Expanded(
-            child: ListView.separated(
-              itemCount: filteredSubsidies.length,
-              separatorBuilder: (context, index) => const Divider(height: 1),
-              itemBuilder: (context, index) {
-                final record = filteredSubsidies[index];
-                return Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-                  child: Column(
-                    children: [
-                      Row(
+            child: subsidiesAsync.when(
+              data: (subsidies) {
+                final filteredSubsidies = subsidies.where((s) {
+                  final matchesSearch = s.memberName.toLowerCase().contains(_searchController.text.toLowerCase()) ||
+                                      s.schemeName.toLowerCase().contains(_searchController.text.toLowerCase());
+                  final matchesFilter = _selectedFilter == 'All' || s.schemeName == _selectedFilter;
+                  return matchesSearch && matchesFilter;
+                }).toList();
+
+                if (filteredSubsidies.isEmpty) {
+                  return Center(child: Text(l10n.noRecentActivity));
+                }
+
+                return ListView.separated(
+                  itemCount: filteredSubsidies.length,
+                  separatorBuilder: (context, index) => const Divider(height: 1),
+                  itemBuilder: (context, index) {
+                    final record = filteredSubsidies[index];
+                    return Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+                      child: Column(
                         children: [
-                          Expanded(flex: 3, child: Text(record.memberName, style: const TextStyle(fontWeight: FontWeight.bold))),
-                          Expanded(flex: 3, child: Text(record.schemeName, style: const TextStyle(color: AppColors.textSecondary, fontSize: 13))),
-                          Expanded(
-                            flex: 2, 
-                            child: Align(
-                              alignment: Alignment.centerRight, 
-                              child: Text('₹${record.amount.toInt()}', style: const TextStyle(fontWeight: FontWeight.bold, color: AppColors.successGreen))
-                            )
+                          Row(
+                            children: [
+                              Expanded(flex: 3, child: Text(record.memberName, style: const TextStyle(fontWeight: FontWeight.bold))),
+                              Expanded(flex: 3, child: Text(record.schemeName, style: const TextStyle(color: AppColors.textSecondary, fontSize: 13))),
+                              Expanded(
+                                flex: 2, 
+                                child: Align(
+                                  alignment: Alignment.centerRight, 
+                                  child: Text('₹${record.amount.toInt()}', style: const TextStyle(fontWeight: FontWeight.bold, color: AppColors.successGreen))
+                                )
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 4),
+                          Align(
+                            alignment: Alignment.centerLeft,
+                            child: Text(
+                              '${l10n.receivedDate}: ${record.date.day} ${_getMonth(record.date.month)} ${record.date.year}',
+                              style: const TextStyle(fontSize: 11, color: AppColors.textSecondary),
+                            ),
                           ),
                         ],
                       ),
-                      const SizedBox(height: 4),
-                      Align(
-                        alignment: Alignment.centerLeft,
-                        child: Text(
-                          '${l10n.receivedDate}: ${record.date.day} ${_getMonth(record.date.month)} ${record.date.year}',
-                          style: const TextStyle(fontSize: 11, color: AppColors.textSecondary),
-                        ),
-                      ),
-                    ],
-                  ),
+                    );
+                  },
                 );
               },
+              loading: () => const Center(child: CircularProgressIndicator()),
+              error: (err, __) => Center(child: Text('Error: $err')),
             ),
           ),
         ],

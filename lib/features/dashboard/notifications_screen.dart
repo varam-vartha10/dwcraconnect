@@ -8,25 +8,19 @@ import '../../domain/entities/notification_entity.dart';
 class NotificationsScreen extends ConsumerWidget {
   const NotificationsScreen({super.key});
 
-  void _markAllRead(WidgetRef ref) {
-    final notifications = ref.read(notificationsProvider);
-    ref.read(notificationsProvider.notifier).state = notifications.map((n) {
-      n.isRead = true;
-      return n;
-    }).toList();
-  }
-
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final l10n = AppLocalizations.of(context)!;
-    final notifications = ref.watch(notificationsProvider);
+    final notificationsAsync = ref.watch(notificationsProvider);
 
     return Scaffold(
       appBar: AppBar(
         title: Text(l10n.notifications),
         actions: [
           TextButton(
-            onPressed: () => _markAllRead(ref),
+            onPressed: () {
+              // Implementation for marking all read via API could go here
+            },
             child: Text(
               l10n.markAllRead,
               style: const TextStyle(
@@ -37,8 +31,10 @@ class NotificationsScreen extends ConsumerWidget {
           ),
         ],
       ),
-      body: notifications.isEmpty
-          ? Center(
+      body: notificationsAsync.when(
+        data: (notifications) {
+          if (notifications.isEmpty) {
+            return Center(
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
@@ -51,15 +47,20 @@ class NotificationsScreen extends ConsumerWidget {
                   Text(l10n.noNotifications),
                 ],
               ),
-            )
-          : ListView.builder(
-              padding: const EdgeInsets.symmetric(vertical: 8),
-              itemCount: notifications.length,
-              itemBuilder: (context, index) {
-                final notification = notifications[index];
-                return _buildNotificationCard(notification, l10n, ref);
-              },
-            ),
+            );
+          }
+          return ListView.builder(
+            padding: const EdgeInsets.symmetric(vertical: 8),
+            itemCount: notifications.length,
+            itemBuilder: (context, index) {
+              final notification = notifications[index];
+              return _buildNotificationCard(notification, l10n, ref);
+            },
+          );
+        },
+        loading: () => const Center(child: CircularProgressIndicator()),
+        error: (err, __) => Center(child: Text('Error: $err')),
+      ),
     );
   }
 
@@ -72,15 +73,15 @@ class NotificationsScreen extends ConsumerWidget {
     IconData categoryIcon;
 
     switch (n.category) {
-      case 'EMI Reminder':
+      case 'emi_reminder':
         categoryColor = AppColors.secondaryPink;
         categoryIcon = Icons.event_note_rounded;
         break;
-      case 'Govt Scheme':
+      case 'gov_scheme':
         categoryColor = AppColors.successGreen;
         categoryIcon = Icons.account_balance_rounded;
         break;
-      case 'Loan Update':
+      case 'loan_update':
         categoryColor = AppColors.trustBlue;
         categoryIcon = Icons.monetization_on_rounded;
         break;
@@ -148,13 +149,7 @@ class NotificationsScreen extends ConsumerWidget {
           ],
         ),
         onTap: () {
-          final notifications = ref.read(notificationsProvider);
-          ref.read(notificationsProvider.notifier).state = notifications.map((
-            item,
-          ) {
-            if (item.id == n.id) item.isRead = true;
-            return item;
-          }).toList();
+          // Implementation for marking individual read via API could go here
         },
       ),
     );

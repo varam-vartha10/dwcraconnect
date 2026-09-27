@@ -11,6 +11,7 @@ import '../../core/widgets/dwcra_drawer.dart';
 import 'member_profile_screen.dart';
 import 'member_list_screen.dart';
 import 'reports_screen.dart';
+import '../chat/presentation/screens/chat_screen.dart';
 
 class LeaderDashboardScreen extends ConsumerWidget {
   const LeaderDashboardScreen({super.key});
@@ -38,6 +39,7 @@ class LeaderDashboardScreen extends ConsumerWidget {
         children: [
           _LeaderHome(name: user?.name ?? l10n.leader),
           const MemberListScreen(),
+          const ChatScreen(),
           const ReportsScreen(),
           const MemberProfileScreen(),
         ],
@@ -53,6 +55,10 @@ class LeaderDashboardScreen extends ConsumerWidget {
           BottomNavigationBarItem(
             icon: const Icon(Icons.people_rounded),
             label: l10n.members,
+          ),
+          BottomNavigationBarItem(
+            icon: const Icon(Icons.chat_bubble_rounded),
+            label: l10n.chat,
           ),
           BottomNavigationBarItem(
             icon: const Icon(Icons.assessment_rounded),
@@ -126,7 +132,7 @@ class _LeaderHome extends ConsumerWidget {
                     '', 
                     Icons.pie_chart_rounded, 
                     AppColors.shgTeal,
-                    onTap: () => ref.read(leaderBottomNavIndexProvider.notifier).state = 2,
+                    onTap: () => ref.read(leaderBottomNavIndexProvider.notifier).state = 3,
                   ),
                   _buildActionCard(l10n.notifications, l10n.newNotifications(3), Icons.notifications_active_rounded, AppColors.lotusPink, 
                       onTap: () => context.push('/notifications')),

@@ -17,36 +17,42 @@ class MemberDetailsScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final l10n = AppLocalizations.of(context)!;
-    final members = ref.watch(memberProvider);
-    final member = members.firstWhere((m) => m.id == memberId, orElse: () => throw Exception('Member not found'));
+    final membersAsync = ref.watch(memberProvider);
 
     return Scaffold(
-      body: CustomScrollView(
-        slivers: [
-          _buildSliverAppBar(context, member.name),
-          SliverToBoxAdapter(
-            child: Padding(
-              padding: const EdgeInsets.all(16.0),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  _buildSectionHeader(context, l10n.personalInfo),
-                  _buildPersonalInfoCard(member, l10n),
-                  const SizedBox(height: 24),
-                  _buildSectionHeader(context, l10n.loans),
-                  _buildLoanSummaryCard(context, member, l10n),
-                  const SizedBox(height: 24),
-                  _buildSectionHeader(context, l10n.emiStatus),
-                  _buildEmiStatusCard(context, member, l10n),
-                  const SizedBox(height: 24),
-                  _buildSectionHeader(context, l10n.subsidyDetails),
-                  _buildSubsidyList(context, member, l10n),
-                  const SizedBox(height: 40),
-                ],
+      body: membersAsync.when(
+        data: (members) {
+          final member = members.firstWhere((m) => m.id == memberId, orElse: () => throw Exception('Member not found'));
+          return CustomScrollView(
+            slivers: [
+              _buildSliverAppBar(context, member.name),
+              SliverToBoxAdapter(
+                child: Padding(
+                  padding: const EdgeInsets.all(16.0),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      _buildSectionHeader(context, l10n.personalInfo),
+                      _buildPersonalInfoCard(member, l10n),
+                      const SizedBox(height: 24),
+                      _buildSectionHeader(context, l10n.loans),
+                      _buildLoanSummaryCard(context, member, l10n),
+                      const SizedBox(height: 24),
+                      _buildSectionHeader(context, l10n.emiStatus),
+                      _buildEmiStatusCard(context, member, l10n),
+                      const SizedBox(height: 24),
+                      _buildSectionHeader(context, l10n.subsidyDetails),
+                      _buildSubsidyList(context, member, l10n),
+                      const SizedBox(height: 40),
+                    ],
+                  ),
+                ),
               ),
-            ),
-          ),
-        ],
+            ],
+          );
+        },
+        loading: () => const Center(child: CircularProgressIndicator()),
+        error: (err, __) => Center(child: Text('Error: $err')),
       ),
     );
   }
@@ -189,7 +195,7 @@ class MemberDetailsScreen extends ConsumerWidget {
       child: ListTile(
         leading: const Icon(Icons.event_note_rounded, color: AppColors.lotusPink),
         title: Text('${l10n.nextEmi}: ₹${member.emiAmount.toInt()}', style: const TextStyle(fontWeight: FontWeight.bold)),
-        subtitle: Text('${l10n.dueDate}: 05 July 2026'),
+        subtitle: const Text('Due Date: 05 July 2026'),
         trailing: Container(
           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
           decoration: BoxDecoration(

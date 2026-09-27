@@ -24,10 +24,7 @@ class _ActiveLoansScreenState extends ConsumerState<ActiveLoansScreen> {
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
-    final loans = ref.watch(loansProvider);
-    final filteredLoans = loans.where((l) => 
-      l.memberName.toLowerCase().contains(_searchController.text.toLowerCase())
-    ).toList();
+    final loansAsync = ref.watch(loansProvider);
 
     return Scaffold(
       appBar: AppBar(
@@ -63,39 +60,53 @@ class _ActiveLoansScreenState extends ConsumerState<ActiveLoansScreen> {
             ),
           ),
           Expanded(
-            child: ListView.separated(
-              itemCount: filteredLoans.length,
-              separatorBuilder: (context, index) => const Divider(height: 1),
-              itemBuilder: (context, index) {
-                final loan = filteredLoans[index];
-                return Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-                  child: Row(
-                    children: [
-                      Expanded(flex: 3, child: Text(loan.memberName, style: const TextStyle(fontWeight: FontWeight.w600))),
-                      Expanded(flex: 2, child: Text('₹${loan.totalAmount.toInt()}')),
-                      Expanded(
-                        flex: 2, 
-                        child: Text(
-                          '₹${loan.remainingAmount.toInt()}',
-                          style: const TextStyle(fontWeight: FontWeight.bold, color: AppColors.primaryPurple),
-                        ),
-                      ),
-                      Expanded(
-                        flex: 2,
-                        child: Text(
-                          loan.status == 'Active' ? l10n.active : loan.status,
-                          style: TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.bold,
-                            color: loan.status == 'Grace Period' ? Colors.orange : AppColors.successGreen,
+            child: loansAsync.when(
+              data: (loans) {
+                final filteredLoans = loans.where((l) => 
+                  l.memberName.toLowerCase().contains(_searchController.text.toLowerCase())
+                ).toList();
+
+                if (filteredLoans.isEmpty) {
+                  return Center(child: Text(l10n.noRecentActivity));
+                }
+
+                return ListView.separated(
+                  itemCount: filteredLoans.length,
+                  separatorBuilder: (context, index) => const Divider(height: 1),
+                  itemBuilder: (context, index) {
+                    final loan = filteredLoans[index];
+                    return Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+                      child: Row(
+                        children: [
+                          Expanded(flex: 3, child: Text(loan.memberName, style: const TextStyle(fontWeight: FontWeight.w600))),
+                          Expanded(flex: 2, child: Text('₹${loan.totalAmount.toInt()}')),
+                          Expanded(
+                            flex: 2, 
+                            child: Text(
+                              '₹${loan.remainingAmount.toInt()}',
+                              style: const TextStyle(fontWeight: FontWeight.bold, color: AppColors.primaryPurple),
+                            ),
                           ),
-                        ),
+                          Expanded(
+                            flex: 2,
+                            child: Text(
+                              loan.status.toUpperCase(),
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.bold,
+                                color: loan.status == 'overdue' ? Colors.redAccent : AppColors.successGreen,
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
-                    ],
-                  ),
+                    );
+                  },
                 );
               },
+              loading: () => const Center(child: CircularProgressIndicator()),
+              error: (err, __) => Center(child: Text('Error: $err')),
             ),
           ),
         ],

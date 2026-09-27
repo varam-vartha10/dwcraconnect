@@ -15,7 +15,7 @@ class SubsidyRepository {
         schemeName: s['schemeName'] ?? '',
         memberName: s['memberName'] ?? 'Member',
         amount: (s['amount'] as num).toDouble(),
-        receivedDate: s['dateReceived'] != null ? DateTime.parse(s['dateReceived']) : DateTime.now(),
+        date: s['dateReceived'] != null ? DateTime.parse(s['dateReceived']) : DateTime.now(),
         status: s['status'] ?? 'pending',
       )).toList();
     }

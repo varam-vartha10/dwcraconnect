@@ -37,6 +37,9 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
   }
 
   void _handleSend() {
+    final chatState = ref.read(chatProvider);
+    if (chatState.isLoading) return;
+
     final text = _controller.text.trim();
     if (text.isNotEmpty) {
       ref.read(chatProvider.notifier).sendMessage(text);
@@ -49,7 +52,6 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
     final chatState = ref.watch(chatProvider);
-    final theme = Theme.of(context);
 
     return Scaffold(
       appBar: AppBar(
@@ -92,10 +94,25 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
           ),
           if (chatState.error != null)
             Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16.0),
-              child: Text(
-                chatState.error!,
-                style: const TextStyle(color: Colors.redAccent, fontSize: 12),
+              padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+              child: Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: Colors.redAccent.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(Icons.error_outline, color: Colors.redAccent, size: 20),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        chatState.error!,
+                        style: const TextStyle(color: Colors.redAccent, fontSize: 12),
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ),
           _buildInputArea(l10n),
@@ -234,7 +251,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
+            SelectableText(
               message.text,
               style: TextStyle(
                 color: isUser ? Colors.white : AppColors.textPrimary,

@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'package:dwcra_connect/l10n/app_localizations.dart';
 import '../constants/app_colors.dart';
 import '../providers/auth_provider.dart';
+import '../providers/navigation_provider.dart';
 import '../utils/logout_dialog.dart';
 import 'dwcra_logo.dart';
 import '../../domain/entities/user_entity.dart';
@@ -65,6 +66,19 @@ class DwcraDrawer extends ConsumerWidget {
             leading: const Icon(Icons.home_rounded, color: AppColors.primaryPurple),
             title: Text(l10n.dashboard),
             onTap: () => Navigator.pop(context),
+          ),
+          ListTile(
+            leading:
+                const Icon(Icons.chat_bubble_rounded, color: AppColors.primaryPurple),
+            title: Text(l10n.chat),
+            onTap: () {
+              Navigator.pop(context);
+              if (user?.role == UserRole.leader) {
+                ref.read(leaderBottomNavIndexProvider.notifier).state = 2;
+              } else {
+                ref.read(memberBottomNavIndexProvider.notifier).state = 1;
+              }
+            },
           ),
           ListTile(
             leading: const Icon(Icons.settings_rounded, color: AppColors.primaryPurple),

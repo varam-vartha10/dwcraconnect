@@ -24,11 +24,7 @@ class _MemberListScreenState extends ConsumerState<MemberListScreen> {
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
-    final members = ref.watch(membersProvider);
-    final filteredMembers = members.where((m) => 
-      m.name.toLowerCase().contains(_searchController.text.toLowerCase()) ||
-      m.id.toLowerCase().contains(_searchController.text.toLowerCase())
-    ).toList();
+    final membersAsync = ref.watch(membersProvider);
 
     return Scaffold(
       appBar: AppBar(
@@ -72,45 +68,60 @@ class _MemberListScreenState extends ConsumerState<MemberListScreen> {
 
           // Member List
           Expanded(
-            child: ListView.separated(
-              itemCount: filteredMembers.length,
-              separatorBuilder: (context, index) => const Divider(height: 1),
-              itemBuilder: (context, index) {
-                final member = filteredMembers[index];
-                return InkWell(
-                  onTap: () {
-                    context.push('/member-details/${member.id}');
+            child: membersAsync.when(
+              data: (members) {
+                final filteredMembers = members.where((m) => 
+                  m.name.toLowerCase().contains(_searchController.text.toLowerCase()) ||
+                  m.id.toLowerCase().contains(_searchController.text.toLowerCase())
+                ).toList();
+
+                if (filteredMembers.isEmpty) {
+                  return Center(child: Text(l10n.noRecentActivity));
+                }
+
+                return ListView.separated(
+                  itemCount: filteredMembers.length,
+                  separatorBuilder: (context, index) => const Divider(height: 1),
+                  itemBuilder: (context, index) {
+                    final member = filteredMembers[index];
+                    return InkWell(
+                      onTap: () {
+                        context.push('/member-details/${member.id}');
+                      },
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+                        child: Row(
+                          children: [
+                            Expanded(
+                              flex: 2,
+                              child: Text(
+                                member.id,
+                                style: const TextStyle(fontSize: 13, color: AppColors.shgTeal, fontWeight: FontWeight.bold),
+                              ),
+                            ),
+                            Expanded(
+                              flex: 3,
+                              child: Text(
+                                member.name,
+                                style: const TextStyle(fontWeight: FontWeight.w600),
+                              ),
+                            ),
+                            Expanded(
+                              flex: 3,
+                              child: Text(
+                                member.mobile,
+                                style: const TextStyle(color: AppColors.textSecondary),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    );
                   },
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-                    child: Row(
-                      children: [
-                        Expanded(
-                          flex: 2,
-                          child: Text(
-                            member.id,
-                            style: const TextStyle(fontSize: 13, color: AppColors.shgTeal, fontWeight: FontWeight.bold),
-                          ),
-                        ),
-                        Expanded(
-                          flex: 3,
-                          child: Text(
-                            member.name,
-                            style: const TextStyle(fontWeight: FontWeight.w600),
-                          ),
-                        ),
-                        Expanded(
-                          flex: 3,
-                          child: Text(
-                            member.mobile,
-                            style: const TextStyle(color: AppColors.textSecondary),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
                 );
               },
+              loading: () => const Center(child: CircularProgressIndicator()),
+              error: (err, __) => Center(child: Text('Error: $err')),
             ),
           ),
         ],

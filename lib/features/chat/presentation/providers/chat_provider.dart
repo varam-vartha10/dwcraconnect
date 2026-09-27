@@ -38,6 +38,7 @@ class ChatNotifier extends StateNotifier<ChatState> {
       timestamp: DateTime.now(),
     );
 
+    // 1. Update state with user message and clear previous errors
     state = state.copyWith(
       messages: [...state.messages, userMessage],
       isLoading: true,
@@ -45,18 +46,22 @@ class ChatNotifier extends StateNotifier<ChatState> {
     );
 
     try {
+      // 2. Call backend
       final result = await _repository.sendMessage(text);
+      
       final assistantMessage = ChatMessage(
         text: result['reply'],
         type: MessageType.assistant,
         timestamp: DateTime.now(),
       );
 
+      // 3. Update state with assistant response
       state = state.copyWith(
         messages: [...state.messages, assistantMessage],
         isLoading: false,
       );
     } catch (e) {
+      // 4. Handle error
       state = state.copyWith(
         isLoading: false,
         error: e.toString().replaceAll('Exception: ', ''),

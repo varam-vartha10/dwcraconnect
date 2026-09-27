@@ -677,4 +677,70 @@ class AppLocalizationsTe extends AppLocalizations {
 
   @override
   String get changePassword => 'పాస్‌వర్డ్ మార్చండి';
+
+  @override
+  String get chat => 'చాట్';
+
+  @override
+  String get chatAssistant => 'డ్వక్రా అసిస్టెంట్';
+
+  @override
+  String get askMeAboutAccount => 'మీ ఖాతా గురించి నన్ను అడగండి';
+
+  @override
+  String get typeQuestionHint => 'మీ ప్రశ్నను టైప్ చేయండి...';
+
+  @override
+  String get loanCategory => 'రుణం';
+
+  @override
+  String get totalLoanQue => 'నా మొత్తం రుణం ఎంత?';
+
+  @override
+  String get remainingLoanQue => 'నాకు ఇంకా ఎంత రుణం మిగిలి ఉంది?';
+
+  @override
+  String get activeLoansQue => 'నా ప్రస్తుత రుణాలను చూపించు.';
+
+  @override
+  String get emiCategory => 'EMI';
+
+  @override
+  String get nextEmiQue => 'నా తదుపరి EMI ఎంత?';
+
+  @override
+  String get emiAmountQue => 'నా EMI మొత్తం ఎంత?';
+
+  @override
+  String get emiDueQue => 'నా EMI ఎప్పుడు చెల్లించాలి?';
+
+  @override
+  String get transactionCategory => 'లావాదేవీలు';
+
+  @override
+  String get recentTransactionsQue => 'నా ఇటీవలి లావాదేవీలను చూపించు.';
+
+  @override
+  String get paymentHistoryQue => 'నా చెల్లింపు చరిత్రను చూపించు.';
+
+  @override
+  String get subsidyCategory => 'సబ్సిడీ';
+
+  @override
+  String get showSubsidiesQue => 'నా సబ్సిడీలను చూపించు.';
+
+  @override
+  String get whatSubsidiesQue => 'నాకు ఏ సబ్సిడీలు ఉన్నాయి?';
+
+  @override
+  String get accountCategory => 'ఖాతా';
+
+  @override
+  String get showProfileQue => 'నా ప్రొఫైల్ చూపించు.';
+
+  @override
+  String get groupIdQue => 'నా గ్రూప్ ID ఏమిటి?';
+
+  @override
+  String get showNotificationsQue => 'నా నోటిఫికేషన్లను చూపించు.';
 }

@@ -59,6 +59,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
   }
 
   Future<UserRole> login(String phoneNumber, String password) async {
+    if (state.isLoading) return UserRole.unknown;
     state = state.copyWith(isLoading: true, errorMessage: null);
 
     try {

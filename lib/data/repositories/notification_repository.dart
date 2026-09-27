@@ -10,11 +10,15 @@ class NotificationRepository {
         id: n['notificationId'] ?? '',
         title: n['title'] ?? '',
         message: n['message'] ?? '',
-        type: n['type'] ?? 'other',
+        category: n['type'] ?? 'other',
+        time: _formatTime(DateTime.parse(n['createdAt'])),
         isRead: n['isRead'] ?? false,
-        timestamp: DateTime.parse(n['createdAt']),
       )).toList();
     }
     return [];
+  }
+
+  String _formatTime(DateTime dt) {
+    return "${dt.day}/${dt.month}/${dt.year}";
   }
 }

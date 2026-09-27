@@ -672,4 +672,70 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get changePassword => 'Change Password';
+
+  @override
+  String get chat => 'Chat';
+
+  @override
+  String get chatAssistant => 'DWCRA Assistant';
+
+  @override
+  String get askMeAboutAccount => 'Ask me about your account';
+
+  @override
+  String get typeQuestionHint => 'Type your question...';
+
+  @override
+  String get loanCategory => 'LOAN';
+
+  @override
+  String get totalLoanQue => 'What is my total loan?';
+
+  @override
+  String get remainingLoanQue => 'How much loan do I have left?';
+
+  @override
+  String get activeLoansQue => 'Show my active loans.';
+
+  @override
+  String get emiCategory => 'EMI';
+
+  @override
+  String get nextEmiQue => 'What is my next EMI?';
+
+  @override
+  String get emiAmountQue => 'How much is my EMI?';
+
+  @override
+  String get emiDueQue => 'When is my EMI due?';
+
+  @override
+  String get transactionCategory => 'TRANSACTIONS';
+
+  @override
+  String get recentTransactionsQue => 'Show my recent transactions.';
+
+  @override
+  String get paymentHistoryQue => 'Show my payment history.';
+
+  @override
+  String get subsidyCategory => 'SUBSIDY';
+
+  @override
+  String get showSubsidiesQue => 'Show my subsidies.';
+
+  @override
+  String get whatSubsidiesQue => 'What subsidies do I have?';
+
+  @override
+  String get accountCategory => 'ACCOUNT';
+
+  @override
+  String get showProfileQue => 'Show my profile.';
+
+  @override
+  String get groupIdQue => 'What is my group ID?';
+
+  @override
+  String get showNotificationsQue => 'Show my notifications.';
 }

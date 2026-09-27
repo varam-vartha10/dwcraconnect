@@ -1399,6 +1399,138 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Change Password'**
   String get changePassword;
+
+  /// No description provided for @chat.
+  ///
+  /// In en, this message translates to:
+  /// **'Chat'**
+  String get chat;
+
+  /// No description provided for @chatAssistant.
+  ///
+  /// In en, this message translates to:
+  /// **'DWCRA Assistant'**
+  String get chatAssistant;
+
+  /// No description provided for @askMeAboutAccount.
+  ///
+  /// In en, this message translates to:
+  /// **'Ask me about your account'**
+  String get askMeAboutAccount;
+
+  /// No description provided for @typeQuestionHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Type your question...'**
+  String get typeQuestionHint;
+
+  /// No description provided for @loanCategory.
+  ///
+  /// In en, this message translates to:
+  /// **'LOAN'**
+  String get loanCategory;
+
+  /// No description provided for @totalLoanQue.
+  ///
+  /// In en, this message translates to:
+  /// **'What is my total loan?'**
+  String get totalLoanQue;
+
+  /// No description provided for @remainingLoanQue.
+  ///
+  /// In en, this message translates to:
+  /// **'How much loan do I have left?'**
+  String get remainingLoanQue;
+
+  /// No description provided for @activeLoansQue.
+  ///
+  /// In en, this message translates to:
+  /// **'Show my active loans.'**
+  String get activeLoansQue;
+
+  /// No description provided for @emiCategory.
+  ///
+  /// In en, this message translates to:
+  /// **'EMI'**
+  String get emiCategory;
+
+  /// No description provided for @nextEmiQue.
+  ///
+  /// In en, this message translates to:
+  /// **'What is my next EMI?'**
+  String get nextEmiQue;
+
+  /// No description provided for @emiAmountQue.
+  ///
+  /// In en, this message translates to:
+  /// **'How much is my EMI?'**
+  String get emiAmountQue;
+
+  /// No description provided for @emiDueQue.
+  ///
+  /// In en, this message translates to:
+  /// **'When is my EMI due?'**
+  String get emiDueQue;
+
+  /// No description provided for @transactionCategory.
+  ///
+  /// In en, this message translates to:
+  /// **'TRANSACTIONS'**
+  String get transactionCategory;
+
+  /// No description provided for @recentTransactionsQue.
+  ///
+  /// In en, this message translates to:
+  /// **'Show my recent transactions.'**
+  String get recentTransactionsQue;
+
+  /// No description provided for @paymentHistoryQue.
+  ///
+  /// In en, this message translates to:
+  /// **'Show my payment history.'**
+  String get paymentHistoryQue;
+
+  /// No description provided for @subsidyCategory.
+  ///
+  /// In en, this message translates to:
+  /// **'SUBSIDY'**
+  String get subsidyCategory;
+
+  /// No description provided for @showSubsidiesQue.
+  ///
+  /// In en, this message translates to:
+  /// **'Show my subsidies.'**
+  String get showSubsidiesQue;
+
+  /// No description provided for @whatSubsidiesQue.
+  ///
+  /// In en, this message translates to:
+  /// **'What subsidies do I have?'**
+  String get whatSubsidiesQue;
+
+  /// No description provided for @accountCategory.
+  ///
+  /// In en, this message translates to:
+  /// **'ACCOUNT'**
+  String get accountCategory;
+
+  /// No description provided for @showProfileQue.
+  ///
+  /// In en, this message translates to:
+  /// **'Show my profile.'**
+  String get showProfileQue;
+
+  /// No description provided for @groupIdQue.
+  ///
+  /// In en, this message translates to:
+  /// **'What is my group ID?'**
+  String get groupIdQue;
+
+  /// No description provided for @showNotificationsQue.
+  ///
+  /// In en, this message translates to:
+  /// **'Show my notifications.'**
+  String get showNotificationsQue;
 }
 
 class _AppLocalizationsDelegate

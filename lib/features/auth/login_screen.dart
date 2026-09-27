@@ -28,6 +28,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   }
 
   Future<void> _handleLogin() async {
+    if (ref.read(authProvider).isLoading) return;
+
     if (_formKey.currentState!.validate()) {
       final role = await ref
           .read(authProvider.notifier)
@@ -87,7 +89,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                     if (authState.errorMessage != null) ...[
                       const SizedBox(height: 16),
                       Text(
-                        l10n.invalidCredentials,
+                        authState.errorMessage!.contains('phone number') || authState.errorMessage!.contains('password')
+                            ? l10n.invalidCredentials
+                            : authState.errorMessage!,
                         textAlign: TextAlign.center,
                         style: const TextStyle(
                           color: Colors.redAccent,

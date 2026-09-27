@@ -10,6 +10,7 @@ import '../../core/widgets/dwcra_logo.dart';
 import '../../core/widgets/dwcra_drawer.dart';
 import 'notifications_screen.dart';
 import 'member_profile_screen.dart';
+import '../chat/presentation/screens/chat_screen.dart';
 
 class MemberDashboardScreen extends ConsumerWidget {
   const MemberDashboardScreen({super.key});
@@ -28,7 +29,7 @@ class MemberDashboardScreen extends ConsumerWidget {
           IconButton(
             icon: const Icon(Icons.notifications_outlined),
             onPressed: () =>
-                ref.read(memberBottomNavIndexProvider.notifier).state = 1,
+                ref.read(memberBottomNavIndexProvider.notifier).state = 2,
           ),
         ],
       ),
@@ -37,6 +38,7 @@ class MemberDashboardScreen extends ConsumerWidget {
         index: selectedIndex,
         children: [
           _MemberHome(name: user?.name ?? l10n.member),
+          const ChatScreen(),
           const NotificationsScreen(),
           const MemberProfileScreen(),
         ],
@@ -49,6 +51,10 @@ class MemberDashboardScreen extends ConsumerWidget {
           BottomNavigationBarItem(
             icon: const Icon(Icons.home_rounded),
             label: l10n.home,
+          ),
+          BottomNavigationBarItem(
+            icon: const Icon(Icons.chat_bubble_rounded),
+            label: l10n.chat,
           ),
           BottomNavigationBarItem(
             icon: const Icon(Icons.notifications_rounded),
@@ -71,72 +77,93 @@ class _MemberHome extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final l10n = AppLocalizations.of(context)!;
-    final member = ref.watch(currentMemberProvider);
+    final user = ref.watch(authProvider).user;
 
-    final loanBal = member?.remainingAmount ?? 0.0;
-    final emiAmt = member?.emiAmount ?? 0.0;
-    final subAmt = member?.subsidyAmount ?? 0.0;
+    final loanBalAsync = ref.watch(loanSummaryProvider);
+    final emiAmtAsync = ref.watch(emiSummaryProvider);
+    final subAmtAsync = ref.watch(subsidySummaryProvider);
 
-    return SingleChildScrollView(
-      child: Column(
-        children: [
-          _buildWelcomeCard(
-            context,
-            name,
-            member?.shgGroup ?? 'Saraswati SHG',
-            l10n,
-          ),
-          Padding(
-            padding: const EdgeInsets.all(16.0),
-            child: GridView.count(
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              crossAxisCount: 2,
-              crossAxisSpacing: 16,
-              mainAxisSpacing: 16,
-              children: [
-                _buildStatCard(
-                  l10n.activeLoans,
-                  '₹${loanBal.toInt()}',
-                  Icons.account_balance_wallet_rounded,
-                  AppColors.shgTeal,
-                  onTap: () => context.push('/loan-balance'),
-                ),
-                _buildStatCard(
-                  l10n.nextEmi,
-                  '₹${emiAmt.toInt()}',
-                  Icons.event_note_rounded,
-                  AppColors.lotusPink,
-                  onTap: () => context.push('/emi-details'),
-                ),
-                _buildStatCard(
-                  l10n.subsidy,
-                  '₹${subAmt.toInt()}',
-                  Icons.savings_rounded,
-                  AppColors.fieldGreen,
-                  onTap: () => context.push('/subsidy-details'),
-                ),
-                _buildStatCard(
-                  l10n.transactionHistory,
-                  l10n.viewAll,
-                  Icons.history_rounded,
-                  AppColors.indigo,
-                  onTap: () => context.push('/transaction-history'),
-                ),
-                _buildStatCard(
-                  l10n.trainingHub,
-                  '3 Videos',
-                  Icons.play_circle_fill_rounded,
-                  AppColors.fieldGreen,
-                  onTap: () => context.push('/training-hub'),
-                ),
-              ],
+    return RefreshIndicator(
+      onRefresh: () async {
+        ref.invalidate(loansProvider);
+        ref.invalidate(emisProvider);
+        ref.invalidate(subsidiesProvider);
+        ref.invalidate(memberTransactionsProvider);
+      },
+      child: SingleChildScrollView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        child: Column(
+          children: [
+            _buildWelcomeCard(
+              context,
+              name,
+              user?.groupId ?? 'Saraswati SHG',
+              l10n,
             ),
-          ),
-          _buildSectionHeader(context, l10n.recentActivity, l10n),
-          _buildTransactionList(ref, l10n),
-          const SizedBox(height: 20),
-        ],
+            Padding(
+              padding: const EdgeInsets.all(16.0),
+              child: GridView.count(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                crossAxisCount: 2,
+                crossAxisSpacing: 16,
+                mainAxisSpacing: 16,
+                children: [
+                  _buildStatCard(
+                    l10n.activeLoans,
+                    loanBalAsync.when(
+                      data: (val) => '₹${val.toInt()}',
+                      loading: () => '...',
+                      error: (_, stack) => 'Error',
+                    ),
+                    Icons.account_balance_wallet_rounded,
+                    AppColors.shgTeal,
+                    onTap: () => context.push('/loan-balance'),
+                  ),
+                  _buildStatCard(
+                    l10n.nextEmi,
+                    emiAmtAsync.when(
+                      data: (val) => '₹${val.toInt()}',
+                      loading: () => '...',
+                      error: (_, stack) => 'Error',
+                    ),
+                    Icons.event_note_rounded,
+                    AppColors.lotusPink,
+                    onTap: () => context.push('/emi-details'),
+                  ),
+                  _buildStatCard(
+                    l10n.subsidy,
+                    subAmtAsync.when(
+                      data: (val) => '₹${val.toInt()}',
+                      loading: () => '...',
+                      error: (_, stack) => 'Error',
+                    ),
+                    Icons.savings_rounded,
+                    AppColors.fieldGreen,
+                    onTap: () => context.push('/subsidy-details'),
+                  ),
+                  _buildStatCard(
+                    l10n.transactionHistory,
+                    l10n.viewAll,
+                    Icons.history_rounded,
+                    AppColors.indigo,
+                    onTap: () => context.push('/transaction-history'),
+                  ),
+                  _buildStatCard(
+                    l10n.trainingHub,
+                    '3 Videos',
+                    Icons.play_circle_fill_rounded,
+                    AppColors.fieldGreen,
+                    onTap: () => context.push('/training-hub'),
+                  ),
+                ],
+              ),
+            ),
+            _buildSectionHeader(context, l10n.recentActivity, l10n),
+            _buildTransactionList(ref, l10n),
+            const SizedBox(height: 20),
+          ],
+        ),
       ),
     );
   }
@@ -242,7 +269,7 @@ class _MemberHome extends ConsumerWidget {
               Text(
                 value,
                 style: TextStyle(
-                  fontSize: 20,
+                  fontSize: 18,
                   fontWeight: FontWeight.bold,
                   color: color,
                 ),
@@ -281,57 +308,65 @@ class _MemberHome extends ConsumerWidget {
   }
 
   Widget _buildTransactionList(WidgetRef ref, AppLocalizations l10n) {
-    final transactions = ref.watch(memberTransactionsProvider);
-    final recent = transactions.take(3).toList();
+    final transactionsAsync = ref.watch(memberTransactionsProvider);
 
-    if (recent.isEmpty) {
-      return Padding(
-        padding: const EdgeInsets.all(20.0),
-        child: Text(l10n.noRecentActivity),
-      );
-    }
-
-    return ListView.builder(
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      itemCount: recent.length,
-      itemBuilder: (context, index) {
-        final tx = recent[index];
-        return Card(
-          margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-          child: ListTile(
-            leading: CircleAvatar(
-              backgroundColor: AppColors.background,
-              child: Icon(
-                tx.type == 'Debit'
-                    ? Icons.remove_circle_outline
-                    : Icons.add_circle_outline,
-                color: tx.type == 'Debit'
-                    ? Colors.redAccent
-                    : AppColors.fieldGreen,
+    return transactionsAsync.when(
+      data: (transactions) {
+        final recent = transactions.take(3).toList();
+        if (recent.isEmpty) {
+          return Padding(
+            padding: const EdgeInsets.all(20.0),
+            child: Text(l10n.noRecentActivity),
+          );
+        }
+        return ListView.builder(
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          itemCount: recent.length,
+          itemBuilder: (context, index) {
+            final tx = recent[index];
+            return Card(
+              margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+              child: ListTile(
+                leading: CircleAvatar(
+                  backgroundColor: AppColors.background,
+                  child: Icon(
+                    tx.type == 'Debit'
+                        ? Icons.remove_circle_outline
+                        : Icons.add_circle_outline,
+                    color: tx.type == 'Debit'
+                        ? Colors.redAccent
+                        : AppColors.fieldGreen,
+                  ),
+                ),
+                title: Text(
+                  tx.description == 'EMI Repayment' || tx.description == 'loan_payment'
+                      ? l10n.loanRepayment
+                      : (tx.description == 'Monthly Savings' || tx.description == 'savings_deposit'
+                            ? l10n.savings
+                            : tx.description),
+                  style: const TextStyle(fontWeight: FontWeight.bold),
+                ),
+                subtitle: Text("${tx.date.day}/${tx.date.month}/${tx.date.year}"),
+                trailing: Text(
+                  '${tx.type == 'Debit' ? '-' : '+'} ₹${tx.amount.toInt()}',
+                  style: TextStyle(
+                    color: tx.type == 'Debit'
+                        ? Colors.redAccent
+                        : AppColors.fieldGreen,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
               ),
-            ),
-            title: Text(
-              tx.description == 'EMI Repayment'
-                  ? l10n.loanRepayment
-                  : (tx.description == 'Monthly Savings'
-                        ? l10n.savings
-                        : tx.description),
-              style: const TextStyle(fontWeight: FontWeight.bold),
-            ),
-            subtitle: Text("${tx.date.day}/${tx.date.month}/${tx.date.year}"),
-            trailing: Text(
-              '${tx.type == 'Debit' ? '-' : '+'} ₹${tx.amount.toInt()}',
-              style: TextStyle(
-                color: tx.type == 'Debit'
-                    ? Colors.redAccent
-                    : AppColors.fieldGreen,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-          ),
+            );
+          },
         );
       },
+      loading: () => const Center(child: Padding(
+        padding: EdgeInsets.all(20.0),
+        child: CircularProgressIndicator(),
+      )),
+      error: (err, stack) => Center(child: Text('Failed to load transactions')),
     );
   }
 }

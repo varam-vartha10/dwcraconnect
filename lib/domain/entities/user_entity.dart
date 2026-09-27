@@ -17,6 +17,8 @@ class UserEntity {
   final String phoneNumber;
   final UserRole role;
   final UserPosition position;
+  final String? village;
+  final String? aadhaar;
 
   const UserEntity({
     required this.id,
@@ -25,5 +27,7 @@ class UserEntity {
     required this.phoneNumber,
     required this.role,
     required this.position,
+    this.village,
+    this.aadhaar,
   });
 }

@@ -1,8 +1,11 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../domain/entities/user_entity.dart';
 import '../../core/providers/auth_provider.dart';
-import '../../data/repositories/mock_repository.dart';
 import '../../data/repositories/emi_repository.dart';
+import '../../data/repositories/loan_repository.dart';
+import '../../data/repositories/transaction_repository.dart';
+import '../../data/repositories/subsidy_repository.dart';
+import '../../data/repositories/notification_repository.dart';
 import '../../domain/entities/transaction_entity.dart';
 import '../../domain/entities/loan_entity.dart';
 import '../../domain/entities/emi_entity.dart';
@@ -11,43 +14,52 @@ import '../../domain/entities/notification_entity.dart';
 import '../../domain/entities/member_entity.dart';
 
 final emiRepositoryProvider = Provider<EmiRepository>((ref) => EmiRepository());
+final loanRepositoryProvider = Provider<LoanRepository>((ref) => LoanRepository());
+final transactionRepositoryProvider = Provider<TransactionRepository>((ref) => TransactionRepository());
+final subsidyRepositoryProvider = Provider<SubsidyRepository>((ref) => SubsidyRepository());
+final notificationRepositoryProvider = Provider<NotificationRepository>((ref) => NotificationRepository());
 
-final membersProvider = Provider<List<MemberEntity>>((ref) {
+final membersProvider = FutureProvider<List<MemberEntity>>((ref) async {
   final user = ref.watch(authProvider).user;
   if (user == null) return [];
-  if (user.role == UserRole.leader) return MockRepository.members;
-  return MockRepository.members.where((m) => m.mobile == user.phoneNumber).toList();
+  // For now returning empty or implementation for leader
+  return [];
 });
 
 final currentMemberProvider = Provider<MemberEntity?>((ref) {
   final user = ref.watch(authProvider).user;
   if (user == null) return null;
-  final matches = MockRepository.members.where((member) => member.mobile == user.phoneNumber).toList();
-  return matches.isEmpty ? null : matches.first;
+  return MemberEntity(
+    id: user.id,
+    name: user.name,
+    mobile: user.phoneNumber,
+    aadhaar: '',
+    village: user.village ?? '',
+    shgGroup: user.groupId,
+    loanAmount: 0,
+    paidAmount: 0,
+    remainingAmount: 0,
+    emiAmount: 0,
+    subsidyAmount: 0,
+  );
 });
 
-final memberTransactionsProvider = Provider<List<TransactionEntity>>((ref) {
-  final member = ref.watch(currentMemberProvider);
-  if (member == null) return [];
-  return MockRepository.transactions.where((tx) => tx.description.contains(member.name.split(' ')[0])).toList();
-});
-
-final transactionsProvider = Provider<List<TransactionEntity>>((ref) {
+final memberTransactionsProvider = FutureProvider<List<TransactionEntity>>((ref) async {
   final user = ref.watch(authProvider).user;
   if (user == null) return [];
-  if (user.role == UserRole.leader) return MockRepository.transactions;
-  final member = ref.read(currentMemberProvider);
-  if (member == null) return [];
-  return MockRepository.transactions.where((tx) => tx.description.contains(member.name.split(' ')[0])).toList();
+  return ref.watch(transactionRepositoryProvider).getTransactions(memberId: user.id);
 });
 
-final loansProvider = Provider<List<LoanEntity>>((ref) {
+final loansProvider = FutureProvider<List<LoanEntity>>((ref) async {
   final user = ref.watch(authProvider).user;
   if (user == null) return [];
-  if (user.role == UserRole.leader) return MockRepository.loans;
-  final member = ref.read(currentMemberProvider);
-  if (member == null) return [];
-  return MockRepository.loans.where((loan) => loan.memberName == member.name).toList();
+  
+  final repository = ref.watch(loanRepositoryProvider);
+  if (user.role == UserRole.leader) {
+    return repository.getLoans(groupId: user.groupId);
+  } else {
+    return repository.getLoans(memberId: user.id);
+  }
 });
 
 final emisProvider = FutureProvider<List<EmiEntity>>((ref) async {
@@ -55,27 +67,61 @@ final emisProvider = FutureProvider<List<EmiEntity>>((ref) async {
   if (user == null) return [];
 
   final repository = ref.watch(emiRepositoryProvider);
-
   if (user.role == UserRole.leader) {
-    final groupId = user.groupId.trim();
-    if (groupId.isEmpty) return [];
-    return repository.getEmis(groupId: groupId);
+    return repository.getEmis(groupId: user.groupId);
   }
-
-  final memberId = user.id.trim();
-  if (memberId.isEmpty) return [];
-  return repository.getEmis(memberId: memberId);
+  return repository.getEmis(memberId: user.id);
 });
 
-final subsidiesProvider = Provider<List<SubsidyEntity>>((ref) {
+final transactionsProvider = FutureProvider<List<TransactionEntity>>((ref) async {
   final user = ref.watch(authProvider).user;
   if (user == null) return [];
-  if (user.role == UserRole.leader) return MockRepository.subsidies;
-  final member = ref.read(currentMemberProvider);
-  if (member == null) return [];
-  return MockRepository.subsidies.where((subsidy) => subsidy.memberName == member.name).toList();
+  
+  final repository = ref.watch(transactionRepositoryProvider);
+  if (user.role == UserRole.leader) {
+    return repository.getTransactions(groupId: user.groupId);
+  }
+  return repository.getTransactions(memberId: user.id);
 });
 
-final notificationsProvider = StateProvider<List<NotificationEntity>>((ref) {
-  return MockRepository.notifications;
+final subsidiesProvider = FutureProvider<List<SubsidyEntity>>((ref) async {
+  final user = ref.watch(authProvider).user;
+  if (user == null) return [];
+
+  final repository = ref.watch(subsidyRepositoryProvider);
+  if (user.role == UserRole.leader) {
+    return repository.getSubsidies(groupId: user.groupId);
+  }
+  return repository.getSubsidies(memberId: user.id);
+});
+
+final notificationsProvider = FutureProvider<List<NotificationEntity>>((ref) async {
+  final user = ref.watch(authProvider).user;
+  if (user == null) return [];
+  return ref.watch(notificationRepositoryProvider).getNotifications();
+});
+
+// Summary providers for dashboard performance
+final loanSummaryProvider = FutureProvider<double>((ref) async {
+  final loans = await ref.watch(loansProvider.future);
+  double sum = 0;
+  for (var loan in loans) {
+    sum += loan.remainingAmount;
+  }
+  return sum;
+});
+
+final emiSummaryProvider = FutureProvider<double>((ref) async {
+  final emis = await ref.watch(emisProvider.future);
+  final pending = emis.where((e) => e.status == 'pending' || e.status == 'overdue').toList();
+  return pending.isEmpty ? 0.0 : pending.first.amount;
+});
+
+final subsidySummaryProvider = FutureProvider<double>((ref) async {
+  final subsidies = await ref.watch(subsidiesProvider.future);
+  double sum = 0;
+  for (var s in subsidies) {
+    sum += s.amount;
+  }
+  return sum;
 });
