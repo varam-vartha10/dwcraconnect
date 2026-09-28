@@ -6,8 +6,6 @@ const Transaction = require("../models/Transaction");
 const Subsidy = require("../models/Subsidy");
 const Notification = require("../models/Notification");
 
-const ACTIVE_LOAN_STATUSES = ["pending", "active", "overdue"];
-
 class ChatServiceError extends Error {
   constructor(statusCode, message) {
     super(message);
@@ -53,37 +51,40 @@ const detectIntent = (message) => {
     .replace(/[.,?!;:()"'']/g, "")
     .replace(/\s+/g, " ");
 
-  // 1. Loan Balance / Remaining (check specific 'left/remaining/balance' first)
+  // 1. Loan Balance / Remaining (highest priority for balance/remaining/left queries)
   if (hasAny(text, [
     /loan (left|remaining|balance)/,
     /how much.*loan.*(left|remaining|balance|pay)/,
-    /how much.*pay/,
+    /how much.*(left|remaining|balance|pay)/,
     /remaining loan/,
     /balance entha/,
     /inka entha loan/,
+    /naa loan entha undi/,
+    /naaku entha loan undi/,
     /రుణం.*మిగిలి/
   ])) return "loan_balance";
 
-  // 2. Loan Total
+  // 2. Loan Total (strict total loan queries)
   if (hasAny(text, [
     /\btotal loan\b/,
     /\bloan amount\b/,
-    /how much.*loan/,
+    /what is my total loan/,
+    /how much loan do i have/,
+    /my total loan/,
     /my loan amount/,
     /మొత్తం రుణం/,
-    /loan entha/,
-    /naa total loan/,
-    /naa loan entha/,
-    /naaku entha loan/
+    /naa total loan/
   ])) return "loan_total";
 
   // 3. Active Loans
   if (hasAny(text, [
     /active loan/,
-    /my loans/,
-    /show.*loans/,
+    /my active loans/,
+    /show.*active loans/,
+    /which.*loans.*active/,
+    /list.*active loans/,
     /ప్రస్తుత రుణాలు/
-  ])) return "active_loans";
+  ]) && !text.includes("total") && !text.includes("balance") && !text.includes("remaining")) return "active_loans";
 
   // 4. Next EMI / EMI Due Date
   if (hasAny(text, [
@@ -180,10 +181,13 @@ const getAuthenticatedUser = async (authenticatedUser) => {
 // Data retrieval functions
 const fetchDataForIntent = async (intent, user) => {
   switch (intent) {
-    case "loan_total":
-    case "loan_balance":
-    case "active_loans": {
-      const loans = await Loan.find({ memberId: user.userId, status: { $in: ACTIVE_LOAN_STATUSES } }).lean();
+    case "loan_total": {
+      const loans = await Loan.find({ memberId: user.userId, status: { $ne: "cancelled" } }).lean();
+      return { loans };
+    }
+
+    case "loan_balance": {
+      const loans = await Loan.find({ memberId: user.userId, status: { $in: ["active", "pending", "overdue"] } }).lean();
       const txs = await Transaction.find({ memberId: user.userId, type: "loan_payment", status: "completed" }).lean();
       const paidEmis = await Emi.find({ memberId: user.userId, status: "paid" }).lean();
 
@@ -194,11 +198,17 @@ const fetchDataForIntent = async (intent, user) => {
       return { loans, totalPaid };
     }
 
+    case "active_loans": {
+      const loans = await Loan.find({ memberId: user.userId, status: { $in: ["active", "pending", "overdue"] } }).lean();
+      return { loans };
+    }
+
     case "next_emi":
     case "emi_amount":
     case "emi_due_date":
     case "emi_details": {
-      return await Emi.findOne({ memberId: user.userId, status: { $in: ["pending", "overdue"] } }).sort({ dueDate: 1 }).lean();
+      const emis = await Emi.find({ memberId: user.userId, status: { $in: ["pending", "overdue"] } }).sort({ dueDate: 1 }).lean();
+      return { emis };
     }
 
     case "transactions": {
@@ -232,58 +242,82 @@ const constructResponse = (intent, data, language, user) => {
   }
 
   if (["next_emi", "emi_amount", "emi_due_date", "emi_details"].includes(intent)) {
-    if (!data) {
+    const emis = data ? data.emis || [] : [];
+    if (emis.length === 0) {
       return isTelugu ? "మీకు ప్రస్తుతం పెండింగ్ ఈఎంఐలు లేవు." : "You don't have any pending EMIs at the moment.";
     }
-  }
 
-  if (["loan_total", "loan_balance", "active_loans"].includes(intent)) {
-    if (!data || !data.loans || data.loans.length === 0) {
-      return isTelugu ? "మీకు ఎటువంటి క్రియాశీల రుణాలు లేవు." : "You don't have any active loans.";
-    }
-  }
+    const now = new Date();
+    const overdueEmis = emis.filter(e => new Date(e.dueDate) < now);
+    const upcomingEmis = emis.filter(e => new Date(e.dueDate) >= now);
 
-  switch (intent) {
-    case "loan_total": {
-      const total = data.loans.reduce((sum, l) => sum + (l.principalAmount || 0), 0);
-      return isTelugu
-        ? `మీ మొత్తం రుణ మొత్తం ₹${total.toLocaleString('en-IN')}.`
-        : `Your total loan amount is ₹${total.toLocaleString('en-IN')}.`;
-    }
+    const primaryEmi = upcomingEmis.length > 0 ? upcomingEmis[0] : overdueEmis[0];
+    const isPrimaryOverdue = upcomingEmis.length === 0 && overdueEmis.length > 0;
 
-    case "loan_balance": {
-      const principal = data.loans.reduce((sum, l) => sum + (l.principalAmount || 0), 0);
-      const balance = Math.max(0, principal - data.totalPaid);
-      return isTelugu
-        ? `మీ మిగిలిన రుణ బకాయి ₹${balance.toLocaleString('en-IN')}.`
-        : `Your remaining loan balance is ₹${balance.toLocaleString('en-IN')}.`;
-    }
+    const amount = primaryEmi.amount || 0;
+    const due = formatDate(primaryEmi.dueDate);
 
-    case "active_loans": {
-      const loanCount = data.loans.length;
-      const loanDetails = data.loans
-        .map(l => `${l.loanType || 'Loan'}: ₹${(l.principalAmount || 0).toLocaleString('en-IN')} (${l.status})`)
-        .join("\n");
-      return (isTelugu ? `మీకు ${loanCount} క్రియాశీల రుణాలు ఉన్నాయి:\n` : `You have ${loanCount} active loan(s):\n`) + loanDetails;
-    }
-
-    case "next_emi":
-    case "emi_due_date":
-    case "emi_details": {
-      const amount = data.amount || 0;
-      const due = formatDate(data.dueDate);
-      return isTelugu
-        ? `మీ తదుపరి ఈఎంఐ ₹${amount.toLocaleString('en-IN')}, గడువు తేదీ ${due}.`
-        : `Your next EMI is ₹${amount.toLocaleString('en-IN')}, due on ${due}.`;
-    }
-
-    case "emi_amount": {
-      const amount = data.amount || 0;
+    if (intent === "emi_amount") {
       return isTelugu
         ? `మీ ఈఎంఐ మొత్తం ₹${amount.toLocaleString('en-IN')}.`
         : `Your EMI amount is ₹${amount.toLocaleString('en-IN')}.`;
     }
 
+    if (isPrimaryOverdue) {
+      return isTelugu
+        ? `మీకు ₹${amount.toLocaleString('en-IN')} బకాయి (ఓవర్‌డ్యూ) ఈఎంఐ ఉంది, గడువు తేదీ ${due}.`
+        : `You have an overdue EMI of ₹${amount.toLocaleString('en-IN')}, which was due on ${due}.`;
+    } else {
+      let reply = isTelugu
+        ? `మీ తదుపరి ఈఎంఐ ₹${amount.toLocaleString('en-IN')}, గడువు తేదీ ${due}.`
+        : `Your next EMI is ₹${amount.toLocaleString('en-IN')}, due on ${due}.`;
+
+      if (overdueEmis.length > 0) {
+        const overdueTotal = overdueEmis.reduce((s, e) => s + (e.amount || 0), 0);
+        reply += isTelugu
+          ? ` (గమనిక: మీకు ₹${overdueTotal.toLocaleString('en-IN')} ఓవర్‌డ్యూ ఈఎంఐ బకాయి ఉంది.)`
+          : ` (Note: You also have an overdue EMI balance of ₹${overdueTotal.toLocaleString('en-IN')}).`;
+      }
+      return reply;
+    }
+  }
+
+  if (intent === "loan_total") {
+    const loans = data ? data.loans || [] : [];
+    if (loans.length === 0) {
+      return isTelugu ? "మీకు ఎటువంటి రుణ రికార్డులు లేవు." : "You do not have any loan records.";
+    }
+    const total = loans.reduce((sum, l) => sum + (l.principalAmount || 0), 0);
+    return isTelugu
+      ? `మీ మొత్తం రుణ మొత్తం ₹${total.toLocaleString('en-IN')}.`
+      : `Your total loan amount is ₹${total.toLocaleString('en-IN')}.`;
+  }
+
+  if (intent === "loan_balance") {
+    const loans = data ? data.loans || [] : [];
+    if (loans.length === 0) {
+      return isTelugu ? "మీకు ఎటువంటి మిగిలిన రుణ బకాయి లేదు." : "You do not have any remaining loan balance.";
+    }
+    const principal = loans.reduce((sum, l) => sum + (l.principalAmount || 0), 0);
+    const balance = Math.max(0, principal - (data.totalPaid || 0));
+    return isTelugu
+      ? `మీ మిగిలిన రుణ బకాయి ₹${balance.toLocaleString('en-IN')}.`
+      : `Your remaining loan balance is ₹${balance.toLocaleString('en-IN')}.`;
+  }
+
+  if (intent === "active_loans") {
+    const loans = data ? data.loans || [] : [];
+    if (loans.length === 0) {
+      return isTelugu ? "మీకు ఎటువంటి క్రియాశీల రుణాలు లేవు." : "You don't have any active loans.";
+    }
+    const loanCount = loans.length;
+    const loanDetails = loans
+      .map(l => `${l.loanType || 'Loan'}: ₹${(l.principalAmount || 0).toLocaleString('en-IN')} (${l.status})`)
+      .join("\n");
+    return (isTelugu ? `మీకు ${loanCount} క్రియాశీల రుణాలు ఉన్నాయి:\n` : `You have ${loanCount} active loan(s):\n`) + loanDetails;
+  }
+
+  switch (intent) {
     case "transactions": {
       if (!data || data.length === 0) {
         return isTelugu ? "ఇటీవలి లావాదేవీలు ఏవీ లేవు." : "No recent transactions found.";
@@ -353,15 +387,38 @@ const createAiReply = async (message, userContext) => {
 };
 
 const processChatMessage = async ({ authenticatedUser, message }) => {
+  const startTime = Date.now();
   try {
     const user = await getAuthenticatedUser(authenticatedUser);
     const language = detectLanguage(message);
     const intent = detectIntent(message);
 
     if (intent !== "unknown") {
+      const dbStart = Date.now();
       const data = await fetchDataForIntent(intent, user);
+      const dbQueryMs = Date.now() - dbStart;
+
+      let recordCount = 0;
+      if (data) {
+        if (Array.isArray(data)) recordCount = data.length;
+        else if (data.loans && Array.isArray(data.loans)) recordCount = data.loans.length;
+        else if (data.emis && Array.isArray(data.emis)) recordCount = data.emis.length;
+        else if (typeof data === "object") recordCount = 1;
+      }
+
+      const reply = constructResponse(intent, data, language, user);
+      const totalMs = Date.now() - startTime;
+
+      if (process.env.NODE_ENV !== "production") {
+        console.log(`[Chat] Query : "${message}"`);
+        console.log(`[Chat] userId: ${user.userId} (${user.name})`);
+        console.log(`[Chat] intent: ${intent}`);
+        console.log(`[Chat] records: ${recordCount}`);
+        console.log(`[Chat] queryMs: ${dbQueryMs} ms | totalMs: ${totalMs} ms`);
+      }
+
       return {
-        reply: constructResponse(intent, data, language, user),
+        reply,
         language,
         intent,
         dataSource: "database"
