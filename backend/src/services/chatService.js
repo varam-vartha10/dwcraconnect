@@ -1,9 +1,12 @@
 const OpenAI = require("openai");
 const User = require("../models/User");
-const Transaction = require("../models/Transaction");
-const Subsidy = require("../models/Subsidy");
-const Notification = require("../models/Notification");
-const { getLoanSummary, getEmiSummary } = require("./financialService");
+const {
+  getMyLoanSummary,
+  getMyEmiSummary,
+  getMySubsidySummary,
+  getMyTransactionSummary,
+  getMyNotificationSummary,
+} = require("./accountSummaryService");
 
 class ChatServiceError extends Error {
   constructor(statusCode, message) {
@@ -138,7 +141,8 @@ const detectIntent = (message) => {
   if (hasAny(text, [
     /subsid(y|ies)/,
     /సబ్సిడీ/,
-    /show.*subsid/
+    /show.*subsid/,
+    /naa subsidy/
   ])) return "subsidies";
 
   // 10. Notifications
@@ -195,26 +199,26 @@ const fetchDataForIntent = async (intent, user) => {
     case "paid_amount":
     case "loan_balance":
     case "active_loans": {
-      return await getLoanSummary(user.userId);
+      return await getMyLoanSummary(user.userId, user.groupId);
     }
 
     case "next_emi":
     case "emi_amount":
     case "emi_due_date":
     case "emi_details": {
-      return await getEmiSummary(user.userId);
+      return await getMyEmiSummary(user.userId, user.groupId);
     }
 
     case "transactions": {
-      return await Transaction.find({ memberId: user.userId }).sort({ paymentDate: -1 }).limit(10).lean();
+      return await getMyTransactionSummary(user.userId, user.groupId, 10);
     }
 
     case "subsidies": {
-      return await Subsidy.find({ memberId: user.userId }).sort({ createdAt: -1 }).limit(5).lean();
+      return await getMySubsidySummary(user.userId, user.groupId);
     }
 
     case "notifications": {
-      return await Notification.find({ memberId: user.userId }).sort({ createdAt: -1 }).limit(5).lean();
+      return await getMyNotificationSummary(user.userId, user.groupId, 10);
     }
 
     case "profile":
@@ -319,52 +323,57 @@ const constructResponse = (intent, data, language, user) => {
     return (isTelugu ? `మీకు ${loanCount} క్రియాశీల రుణాలు ఉన్నాయి:\n` : `You have ${loanCount} active loan(s):\n`) + loanDetails;
   }
 
-  switch (intent) {
-    case "transactions": {
-      if (!data || data.length === 0) {
-        return isTelugu ? "ఇటీవలి లావాదేవీలు ఏవీ లేవు." : "No recent transactions found.";
-      }
-      const txList = data
-        .map(t => `${formatDate(t.paymentDate || t.createdAt)}: ₹${t.amount} (${t.type || 'payment'})`)
-        .join("\n");
-      return (isTelugu ? "ఇటీవలి లావాదేవీలు:\n" : "Recent transactions:\n") + txList;
+  // Transactions
+  if (intent === "transactions") {
+    const txSummary = data || {};
+    if (!txSummary.hasTransactions) {
+      return isTelugu ? "ఇటీవలి లావాదేవీలు ఏవీ లేవు." : "No recent transactions found.";
     }
-
-    case "subsidies": {
-      if (!data || data.length === 0) {
-        return isTelugu ? "సబ్సిడీలు ఏవీ లేవు." : "No subsidies found.";
-      }
-      const subList = data
-        .map(s => `${s.schemeName || 'Subsidy'}: ₹${s.amount} (${s.status})`)
-        .join("\n");
-      return (isTelugu ? "మీ సబ్సిడీ వివరాలు:\n" : "Your subsidy details:\n") + subList;
-    }
-
-    case "notifications": {
-      if (!data || data.length === 0) {
-        return isTelugu ? "నోటిఫికేషన్లు ఏవీ లేవు." : "No notifications found.";
-      }
-      const notifList = data.map(n => `- ${n.title}`).join("\n");
-      return (isTelugu ? "ఇటీవలి నోటిఫికేషన్లు:\n" : "Recent notifications:\n") + notifList;
-    }
-
-    case "profile": {
-      return isTelugu
-        ? `పేరు: ${data.name}\nID: ${data.userId}\nగ్రూప్: ${data.groupId}`
-        : `Name: ${data.name}\nID: ${data.userId}\nGroup: ${data.groupId}`;
-    }
-
-    case "group_id": {
-      return isTelugu
-        ? `మీ గ్రూప్ ఐడి ${data.groupId}.`
-        : `Your Group ID is ${data.groupId}.`;
-    }
-
-    default:
-      return isTelugu
-        ? "నేను మీకు మీ రుణం, ఈఎంఐ, లావాదేవీలు, సబ్సిడీలు, నోటిఫికేషన్లు మరియు ప్రొఫైల్ వివరాల గురించి సహాయం చేయగలను."
-        : "I can help you with your loan, EMI, transactions, subsidies, notifications and profile.";
+    const txList = txSummary.transactions
+      .map(t => `${formatDate(t.paymentDate || t.createdAt)}: ₹${t.amount} (${t.type || 'payment'})`)
+      .join("\n");
+    return (isTelugu ? "ఇటీవలి లావాదేవీలు:\n" : "Recent transactions:\n") + txList;
   }
+
+  // Subsidies
+  if (intent === "subsidies") {
+    const subSummary = data || {};
+    if (!subSummary.hasSubsidies) {
+      return isTelugu
+        ? "మీ ఖాతా కోసం ఎటువంటి సబ్సిడీ రికార్డులు కనుగొనబడలేదు."
+        : "I couldn't find any subsidy records for your account.";
+    }
+    const subList = subSummary.subsidies
+      .map(s => `${s.schemeName || 'Subsidy'}: ₹${s.amount} (${s.status})`)
+      .join("\n");
+    return (isTelugu ? "మీ సబ్సిడీ వివరాలు:\n" : "Your subsidy details:\n") + subList;
+  }
+
+  // Notifications
+  if (intent === "notifications") {
+    const notifSummary = data || {};
+    if (!notifSummary.hasNotifications) {
+      return isTelugu ? "నోటిఫికేషన్లు ఏవీ లేవు." : "No notifications found.";
+    }
+    const notifList = notifSummary.notifications.map(n => `- ${n.title}`).join("\n");
+    return (isTelugu ? "ఇటీవలి నోటిఫికేషన్లు:\n" : "Recent notifications:\n") + notifList;
+  }
+
+  if (intent === "profile") {
+    return isTelugu
+      ? `పేరు: ${data.name}\nID: ${data.userId}\nగ్రూప్: ${data.groupId}`
+      : `Name: ${data.name}\nID: ${data.userId}\nGroup: ${data.groupId}`;
+  }
+
+  if (intent === "group_id") {
+    return isTelugu
+      ? `మీ గ్రూప్ ఐడి ${data.groupId}.`
+      : `Your Group ID is ${data.groupId}.`;
+  }
+
+  return isTelugu
+    ? "నేను మీకు మీ రుణం, ఈఎంఐ, లావాదేవీలు, సబ్సిడీలు, నోటిఫికేషన్లు మరియు ప్రొఫైల్ వివరాల గురించి సహాయం చేయగలను."
+    : "I can help you with your loan, EMI, transactions, subsidies, notifications and profile.";
 };
 
 const createAiReply = async (message, userContext) => {
@@ -402,9 +411,11 @@ const processChatMessage = async ({ authenticatedUser, message }) => {
 
       let recordCount = 0;
       if (data) {
-        if (Array.isArray(data)) recordCount = data.length;
-        else if (data.loans && Array.isArray(data.loans)) recordCount = data.loans.length;
+        if (data.loans && Array.isArray(data.loans)) recordCount = data.loans.length;
         else if (data.emis && Array.isArray(data.emis)) recordCount = data.emis.length;
+        else if (data.subsidies && Array.isArray(data.subsidies)) recordCount = data.subsidies.length;
+        else if (data.transactions && Array.isArray(data.transactions)) recordCount = data.transactions.length;
+        else if (data.notifications && Array.isArray(data.notifications)) recordCount = data.notifications.length;
         else if (typeof data === "object") recordCount = 1;
       }
 
@@ -412,11 +423,12 @@ const processChatMessage = async ({ authenticatedUser, message }) => {
       const totalMs = Date.now() - startTime;
 
       if (process.env.NODE_ENV !== "production") {
-        console.log(`[Chat] Query : "${message}"`);
-        console.log(`[Chat] userId: ${user.userId} (${user.name})`);
-        console.log(`[Chat] intent: ${intent}`);
-        console.log(`[Chat] records: ${recordCount}`);
-        console.log(`[Chat] queryMs: ${dbQueryMs} ms | totalMs: ${totalMs} ms`);
+        console.log(`[CHAT DEBUG] message : "${message}"`);
+        console.log(`[CHAT DEBUG] userId  : ${user.userId}`);
+        console.log(`[CHAT DEBUG] groupId : ${user.groupId}`);
+        console.log(`[CHAT DEBUG] intent  : ${intent}`);
+        console.log(`[CHAT DEBUG] records : ${recordCount}`);
+        console.log(`[CHAT DEBUG] queryMs : ${dbQueryMs} ms | totalMs: ${totalMs} ms`);
       }
 
       return {
