@@ -8,16 +8,28 @@ const Notification = require("../models/Notification");
 /**
  * Account Summary Service
  * Central source of truth for both Dashboard APIs and Chatbot API.
+ * Supports Member personal view & Leader group view fallback.
  */
 
 // 1. Loan Summary
-const getMyLoanSummary = async (userId, groupId) => {
-  const filter = { memberId: userId };
-  if (groupId) filter.groupId = groupId;
+const getMyLoanSummary = async (userId, groupId, role = "member") => {
+  let filter = { memberId: userId, status: { $ne: "cancelled" } };
+  let isGroupSummary = false;
 
-  const loans = await Loan.find(filter).sort({ createdAt: -1 }).lean();
-  const txs = await Transaction.find({ memberId: userId, type: "loan_payment", status: "completed" }).lean();
-  const paidEmis = await Emi.find({ memberId: userId, status: "paid" }).lean();
+  let loans = await Loan.find(filter).sort({ createdAt: -1 }).lean();
+
+  // If leader has no personal loan, fetch group loans
+  if (loans.length === 0 && (role === "leader" || role === "president" || role === "secretary") && groupId) {
+    filter = { groupId: groupId, status: { $ne: "cancelled" } };
+    loans = await Loan.find(filter).sort({ createdAt: -1 }).lean();
+    isGroupSummary = true;
+  }
+
+  const txFilter = isGroupSummary ? { groupId: groupId, type: "loan_payment", status: "completed" } : { memberId: userId, type: "loan_payment", status: "completed" };
+  const emiFilter = isGroupSummary ? { groupId: groupId, status: "paid" } : { memberId: userId, status: "paid" };
+
+  const txs = await Transaction.find(txFilter).lean();
+  const paidEmis = await Emi.find(emiFilter).lean();
 
   const totalTxPaid = txs.reduce((sum, t) => sum + (t.amount || 0), 0);
   const totalEmiPaid = paidEmis.reduce((sum, e) => sum + (e.amount || 0), 0);
@@ -30,6 +42,7 @@ const getMyLoanSummary = async (userId, groupId) => {
 
   return {
     hasLoans: loans.length > 0,
+    isGroupSummary,
     loanCount: loans.length,
     activeLoanCount: activeLoans.length,
     loans,
@@ -42,17 +55,22 @@ const getMyLoanSummary = async (userId, groupId) => {
 };
 
 // 2. EMI Summary
-const getMyEmiSummary = async (userId, groupId) => {
-  const filter = { memberId: userId };
-  if (groupId) filter.groupId = groupId;
+const getMyEmiSummary = async (userId, groupId, role = "member") => {
+  let filter = { memberId: userId };
+  let isGroupSummary = false;
 
-  const emis = await Emi.find(filter).sort({ dueDate: 1 }).lean();
+  let emis = await Emi.find(filter).sort({ dueDate: 1 }).lean();
+
+  if (emis.length === 0 && (role === "leader" || role === "president" || role === "secretary") && groupId) {
+    filter = { groupId: groupId };
+    emis = await Emi.find(filter).sort({ dueDate: 1 }).lean();
+    isGroupSummary = true;
+  }
+
   const now = new Date();
-
   const paidEmis = emis.filter(e => e.status === "paid");
   const unpaidEmis = emis.filter(e => e.status !== "paid");
 
-  // Dynamically evaluate overdue vs upcoming for unpaid EMIs
   const overdueEmis = unpaidEmis.filter(e => new Date(e.dueDate) < now);
   const upcomingEmis = unpaidEmis.filter(e => new Date(e.dueDate) >= now);
 
@@ -64,6 +82,7 @@ const getMyEmiSummary = async (userId, groupId) => {
 
   return {
     hasEmis: emis.length > 0,
+    isGroupSummary,
     totalEmisCount: emis.length,
     paidEmisCount: paidEmis.length,
     unpaidEmisCount: unpaidEmis.length,
@@ -82,15 +101,23 @@ const getMyEmiSummary = async (userId, groupId) => {
 };
 
 // 3. Subsidy Summary
-const getMySubsidySummary = async (userId, groupId) => {
-  const filter = { memberId: userId };
-  if (groupId) filter.groupId = groupId;
+const getMySubsidySummary = async (userId, groupId, role = "member") => {
+  let filter = { memberId: userId };
+  let isGroupSummary = false;
 
-  const subsidies = await Subsidy.find(filter).sort({ createdAt: -1 }).lean();
+  let subsidies = await Subsidy.find(filter).sort({ createdAt: -1 }).lean();
+
+  if (subsidies.length === 0 && (role === "leader" || role === "president" || role === "secretary") && groupId) {
+    filter = { groupId: groupId };
+    subsidies = await Subsidy.find(filter).sort({ createdAt: -1 }).lean();
+    isGroupSummary = true;
+  }
+
   const totalAmount = subsidies.reduce((sum, s) => sum + (s.amount || 0), 0);
 
   return {
     hasSubsidies: subsidies.length > 0,
+    isGroupSummary,
     count: subsidies.length,
     totalAmount,
     subsidies,
@@ -98,17 +125,25 @@ const getMySubsidySummary = async (userId, groupId) => {
 };
 
 // 4. Transaction Summary
-const getMyTransactionSummary = async (userId, groupId, limit = 10) => {
-  const filter = { memberId: userId };
-  if (groupId) filter.groupId = groupId;
+const getMyTransactionSummary = async (userId, groupId, role = "member", limit = 10) => {
+  let filter = { memberId: userId };
+  let isGroupSummary = false;
 
-  const transactions = await Transaction.find(filter).sort({ paymentDate: -1 }).limit(limit).lean();
+  let transactions = await Transaction.find(filter).sort({ paymentDate: -1 }).limit(limit).lean();
+
+  if (transactions.length === 0 && (role === "leader" || role === "president" || role === "secretary") && groupId) {
+    filter = { groupId: groupId };
+    transactions = await Transaction.find(filter).sort({ paymentDate: -1 }).limit(limit).lean();
+    isGroupSummary = true;
+  }
+
   const totalPaid = transactions
     .filter(t => t.type === "loan_payment" && t.status === "completed")
     .reduce((sum, t) => sum + (t.amount || 0), 0);
 
   return {
     hasTransactions: transactions.length > 0,
+    isGroupSummary,
     count: transactions.length,
     totalPaid,
     transactions,
@@ -116,15 +151,23 @@ const getMyTransactionSummary = async (userId, groupId, limit = 10) => {
 };
 
 // 5. Notification Summary
-const getMyNotificationSummary = async (userId, groupId, limit = 10) => {
-  const filter = { memberId: userId };
-  if (groupId) filter.groupId = groupId;
+const getMyNotificationSummary = async (userId, groupId, role = "member", limit = 10) => {
+  let filter = { memberId: userId };
+  let isGroupSummary = false;
 
-  const notifications = await Notification.find(filter).sort({ createdAt: -1 }).limit(limit).lean();
+  let notifications = await Notification.find(filter).sort({ createdAt: -1 }).limit(limit).lean();
+
+  if (notifications.length === 0 && (role === "leader" || role === "president" || role === "secretary") && groupId) {
+    filter = { groupId: groupId };
+    notifications = await Notification.find(filter).sort({ createdAt: -1 }).limit(limit).lean();
+    isGroupSummary = true;
+  }
+
   const unreadCount = notifications.filter(n => !n.isRead).length;
 
   return {
     hasNotifications: notifications.length > 0,
+    isGroupSummary,
     count: notifications.length,
     unreadCount,
     notifications,
@@ -132,14 +175,14 @@ const getMyNotificationSummary = async (userId, groupId, limit = 10) => {
 };
 
 // 6. Complete Master Account Summary
-const getMyAccountSummary = async (userId, groupId) => {
+const getMyAccountSummary = async (userId, groupId, role = "member") => {
   const user = await User.findOne({ userId }).select("-password").lean();
   const [loanSummary, emiSummary, subsidySummary, txSummary, notifSummary] = await Promise.all([
-    getMyLoanSummary(userId, groupId),
-    getMyEmiSummary(userId, groupId),
-    getMySubsidySummary(userId, groupId),
-    getMyTransactionSummary(userId, groupId),
-    getMyNotificationSummary(userId, groupId),
+    getMyLoanSummary(userId, groupId, role),
+    getMyEmiSummary(userId, groupId, role),
+    getMySubsidySummary(userId, groupId, role),
+    getMyTransactionSummary(userId, groupId, role),
+    getMyNotificationSummary(userId, groupId, role),
   ]);
 
   return {

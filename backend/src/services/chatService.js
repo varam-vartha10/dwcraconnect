@@ -199,26 +199,26 @@ const fetchDataForIntent = async (intent, user) => {
     case "paid_amount":
     case "loan_balance":
     case "active_loans": {
-      return await getMyLoanSummary(user.userId, user.groupId);
+      return await getMyLoanSummary(user.userId, user.groupId, user.role);
     }
 
     case "next_emi":
     case "emi_amount":
     case "emi_due_date":
     case "emi_details": {
-      return await getMyEmiSummary(user.userId, user.groupId);
+      return await getMyEmiSummary(user.userId, user.groupId, user.role);
     }
 
     case "transactions": {
-      return await getMyTransactionSummary(user.userId, user.groupId, 10);
+      return await getMyTransactionSummary(user.userId, user.groupId, user.role, 10);
     }
 
     case "subsidies": {
-      return await getMySubsidySummary(user.userId, user.groupId);
+      return await getMySubsidySummary(user.userId, user.groupId, user.role);
     }
 
     case "notifications": {
-      return await getMyNotificationSummary(user.userId, user.groupId, 10);
+      return await getMyNotificationSummary(user.userId, user.groupId, user.role, 10);
     }
 
     case "profile":
@@ -243,7 +243,7 @@ const constructResponse = (intent, data, language, user) => {
   if (["next_emi", "emi_amount", "emi_due_date", "emi_details"].includes(intent)) {
     const emiSummary = data || {};
     if (!emiSummary.hasEmis || emiSummary.unpaidEmisCount === 0) {
-      return isTelugu ? "మీకు ప్రస్తుతం పెండింగ్ ఈఎంఐలు లేవు." : "You don't have any pending EMIs at the moment.";
+      return isTelugu ? "మీకు లేదా మీ గ్రూప్ కి ప్రస్తుతం పెండింగ్ ఈఎంఐలు లేవు." : "You don't have any pending EMIs at the moment.";
     }
 
     const nextUpcoming = emiSummary.nextUpcomingEmi;
@@ -253,16 +253,18 @@ const constructResponse = (intent, data, language, user) => {
       const primary = nextUpcoming || primaryOverdue;
       const amt = primary.amount || 0;
       return isTelugu
-        ? `మీ ఈఎంఐ మొత్తం ₹${amt.toLocaleString('en-IN')}.`
+        ? `ఈఎంఐ మొత్తం ₹${amt.toLocaleString('en-IN')}.`
         : `Your EMI amount is ₹${amt.toLocaleString('en-IN')}.`;
     }
 
     if (nextUpcoming) {
       const amt = nextUpcoming.amount || 0;
       const due = formatDate(nextUpcoming.dueDate);
-      let reply = isTelugu
-        ? `మీ తదుపరి ఈఎంఐ ₹${amt.toLocaleString('en-IN')}, గడువు తేదీ ${due}.`
-        : `Your next EMI is ₹${amt.toLocaleString('en-IN')}, due on ${due}.`;
+      const prefix = emiSummary.isGroupSummary
+        ? (isTelugu ? `మీ గ్రూప్ (${user.groupId}) తదుపరి ఈఎంఐ` : `Your group (${user.groupId}) next EMI is`)
+        : (isTelugu ? "మీ తదుపరి ఈఎంఐ" : "Your next EMI is");
+
+      let reply = `${prefix} ₹${amt.toLocaleString('en-IN')}, due on ${due}.`;
 
       if (emiSummary.overdueEmisCount > 0 && primaryOverdue) {
         reply += isTelugu
@@ -284,31 +286,39 @@ const constructResponse = (intent, data, language, user) => {
     const loanSummary = data || {};
     if (!loanSummary.hasLoans) {
       return isTelugu
-        ? "మీ ఖాతా కోసం ఎటువంటి రుణ రికార్డులు కనుగొనబడలేదు."
-        : "I couldn't find any loan records for your account.";
+        ? "మీ ఖాతా లేదా మీ గ్రూప్ కోసం ఎటువంటి రుణ రికార్డులు కనుగొనబడలేదు."
+        : "I couldn't find any loan records for your account or group.";
     }
-    return isTelugu
-      ? `మీ మొత్తం రుణ మొత్తం ₹${loanSummary.totalPrincipal.toLocaleString('en-IN')}.`
-      : `Your total loan amount is ₹${loanSummary.totalPrincipal.toLocaleString('en-IN')}.`;
+
+    const prefix = loanSummary.isGroupSummary
+      ? (isTelugu ? `మీ గ్రూప్ (${user.groupId}) మొత్తం రుణ మొత్తం` : `Your group (${user.groupId}) total loan amount is`)
+      : (isTelugu ? "మీ మొత్తం రుణ మొత్తం" : "Your total loan amount is");
+
+    return `${prefix} ₹${loanSummary.totalPrincipal.toLocaleString('en-IN')}.`;
   }
 
   if (intent === "paid_amount") {
     const loanSummary = data || {};
-    return isTelugu
-      ? `మీరు మీ రుణ చెల్లింపుల కోసం మొత్తం ₹${loanSummary.totalPaid.toLocaleString('en-IN')} చెల్లించారు.`
-      : `You have paid a total of ₹${loanSummary.totalPaid.toLocaleString('en-IN')} towards your loan payments.`;
+    const prefix = loanSummary.isGroupSummary
+      ? (isTelugu ? `మీ గ్రూప్ (${user.groupId}) చెల్లించిన మొత్తం` : `Your group (${user.groupId}) has paid a total of`)
+      : (isTelugu ? "మీరు చెల్లించిన మొత్తం" : "You have paid a total of");
+
+    return `${prefix} ₹${loanSummary.totalPaid.toLocaleString('en-IN')} towards loan payments.`;
   }
 
   if (intent === "loan_balance") {
     const loanSummary = data || {};
     if (!loanSummary.hasLoans || loanSummary.activeLoanCount === 0) {
       return isTelugu
-        ? "మీకు ఎటువంటి మిగిలిన రుణ బకాయి లేదు."
+        ? "మీకు లేదా మీ గ్రూప్ కి ఎటువంటి మిగిలిన రుణ బకాయి లేదు."
         : "You do not have any remaining loan balance.";
     }
-    return isTelugu
-      ? `మీ మిగిలిన రుణ బకాయి ₹${loanSummary.remainingBalance.toLocaleString('en-IN')}.`
-      : `Your remaining loan balance is ₹${loanSummary.remainingBalance.toLocaleString('en-IN')}.`;
+
+    const prefix = loanSummary.isGroupSummary
+      ? (isTelugu ? `మీ గ్రూప్ (${user.groupId}) మిగిలిన రుణ బకాయి` : `Your group (${user.groupId}) remaining loan balance is`)
+      : (isTelugu ? "మీ మిగిలిన రుణ బకాయి" : "Your remaining loan balance is");
+
+    return `${prefix} ₹${loanSummary.remainingBalance.toLocaleString('en-IN')}.`;
   }
 
   if (intent === "active_loans") {
@@ -318,9 +328,14 @@ const constructResponse = (intent, data, language, user) => {
     }
     const loanCount = loanSummary.activeLoanCount;
     const loanDetails = loanSummary.activeLoans
-      .map(l => `${l.loanType || 'Loan'}: ₹${(l.principalAmount || 0).toLocaleString('en-IN')} (${l.status})`)
+      .map(l => `${l.loanType || 'Loan'} (${l.memberId}): ₹${(l.principalAmount || 0).toLocaleString('en-IN')} [${l.status}]`)
       .join("\n");
-    return (isTelugu ? `మీకు ${loanCount} క్రియాశీల రుణాలు ఉన్నాయి:\n` : `You have ${loanCount} active loan(s):\n`) + loanDetails;
+
+    const header = loanSummary.isGroupSummary
+      ? (isTelugu ? `మీ గ్రూప్ (${user.groupId}) నందు ${loanCount} క్రియాశీల రుణాలు ఉన్నాయి:\n` : `Your group (${user.groupId}) has ${loanCount} active loan(s):\n`)
+      : (isTelugu ? `మీకు ${loanCount} క్రియాశీల రుణాలు ఉన్నాయి:\n` : `You have ${loanCount} active loan(s):\n`);
+
+    return header + loanDetails;
   }
 
   // Transactions
@@ -340,13 +355,13 @@ const constructResponse = (intent, data, language, user) => {
     const subSummary = data || {};
     if (!subSummary.hasSubsidies) {
       return isTelugu
-        ? "మీ ఖాతా కోసం ఎటువంటి సబ్సిడీ రికార్డులు కనుగొనబడలేదు."
-        : "I couldn't find any subsidy records for your account.";
+        ? "మీ ఖాతా లేదా మీ గ్రూప్ కోసం ఎటువంటి సబ్సిడీ రికార్డులు కనుగొనబడలేదు."
+        : "I couldn't find any subsidy records for your account or group.";
     }
     const subList = subSummary.subsidies
-      .map(s => `${s.schemeName || 'Subsidy'}: ₹${s.amount} (${s.status})`)
+      .map(s => `${s.schemeName || 'Subsidy'} (${s.memberId}): ₹${s.amount} [${s.status}]`)
       .join("\n");
-    return (isTelugu ? "మీ సబ్సిడీ వివరాలు:\n" : "Your subsidy details:\n") + subList;
+    return (isTelugu ? "సబ్సిడీ వివరాలు:\n" : "Subsidy details:\n") + subList;
   }
 
   // Notifications
@@ -426,6 +441,7 @@ const processChatMessage = async ({ authenticatedUser, message }) => {
         console.log(`[CHAT DEBUG] message : "${message}"`);
         console.log(`[CHAT DEBUG] userId  : ${user.userId}`);
         console.log(`[CHAT DEBUG] groupId : ${user.groupId}`);
+        console.log(`[CHAT DEBUG] role    : ${user.role}`);
         console.log(`[CHAT DEBUG] intent  : ${intent}`);
         console.log(`[CHAT DEBUG] records : ${recordCount}`);
         console.log(`[CHAT DEBUG] queryMs : ${dbQueryMs} ms | totalMs: ${totalMs} ms`);
