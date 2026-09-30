@@ -1,4 +1,5 @@
 const Emi = require("../models/Emi");
+const { processEmiPayment } = require("../services/financialService");
 
 const getEmis = async (req, res) => {
   try {
@@ -31,4 +32,37 @@ const getEmis = async (req, res) => {
   }
 };
 
-module.exports = { getEmis };
+const payEmi = async (req, res) => {
+  try {
+    const { emiId, amount, notes } = req.body;
+    const { userId, groupId } = req.user;
+
+    if (!emiId) {
+      return res.status(400).json({ success: false, message: "emiId is required" });
+    }
+
+    const result = await processEmiPayment({
+      memberId: userId,
+      groupId,
+      emiId,
+      amount,
+      paymentDate: new Date(),
+      notes,
+    });
+
+    res.status(200).json({
+      success: true,
+      message: "EMI payment recorded successfully",
+      emi: result.emi,
+      transaction: result.transaction,
+    });
+  } catch (error) {
+    console.error("Pay EMI error:", error.message);
+    res.status(400).json({
+      success: false,
+      message: error.message || "Failed to process EMI payment",
+    });
+  }
+};
+
+module.exports = { getEmis, payEmi };

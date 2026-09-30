@@ -2,6 +2,7 @@ const Loan = require("../models/Loan");
 const Emi = require("../models/Emi");
 const { calculateMonthlyEmi } = require("../utils/emiCalculator");
 const { generateEmiSchedule } = require("../utils/emiSchedule");
+const { getLoanSummary } = require("../services/financialService");
 
 const getLoans = async (req, res) => {
   try {
@@ -18,10 +19,18 @@ const getLoans = async (req, res) => {
 
     const loans = await Loan.find(filter).sort({ createdAt: -1 }).lean();
 
+    const enrichedLoans = await Promise.all(loans.map(async (l) => {
+      const summary = await getLoanSummary(l.memberId);
+      return {
+        ...l,
+        remainingAmount: summary.remainingBalance,
+      };
+    }));
+
     res.status(200).json({
       success: true,
-      count: loans.length,
-      loans,
+      count: enrichedLoans.length,
+      loans: enrichedLoans,
     });
   } catch (error) {
     console.error("Get loans error:", error);

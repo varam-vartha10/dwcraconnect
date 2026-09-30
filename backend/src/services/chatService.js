@@ -1,10 +1,9 @@
 const OpenAI = require("openai");
 const User = require("../models/User");
-const Loan = require("../models/Loan");
-const Emi = require("../models/Emi");
 const Transaction = require("../models/Transaction");
 const Subsidy = require("../models/Subsidy");
 const Notification = require("../models/Notification");
+const { getLoanSummary, getEmiSummary } = require("./financialService");
 
 class ChatServiceError extends Error {
   constructor(statusCode, message) {
@@ -51,7 +50,16 @@ const detectIntent = (message) => {
     .replace(/[.,?!;:()"'']/g, "")
     .replace(/\s+/g, " ");
 
-  // 1. Loan Balance / Remaining (highest priority for balance/remaining/left queries)
+  // 1. Paid Amount
+  if (hasAny(text, [
+    /how much.*paid/,
+    /total paid/,
+    /nenu entha pay/,
+    /paid amount/,
+    /payment completed/
+  ])) return "paid_amount";
+
+  // 2. Loan Balance / Remaining (highest priority for balance/remaining/left/inka entha queries)
   if (hasAny(text, [
     /loan (left|remaining|balance)/,
     /how much.*loan.*(left|remaining|balance|pay)/,
@@ -59,12 +67,14 @@ const detectIntent = (message) => {
     /remaining loan/,
     /balance entha/,
     /inka entha loan/,
+    /loan inka entha/,
     /naa loan entha undi/,
+    /naa loan inka entha undi/,
     /naaku entha loan undi/,
     /రుణం.*మిగిలి/
   ])) return "loan_balance";
 
-  // 2. Loan Total (strict total loan queries)
+  // 3. Loan Total (strict total loan queries)
   if (hasAny(text, [
     /\btotal loan\b/,
     /\bloan amount\b/,
@@ -76,7 +86,7 @@ const detectIntent = (message) => {
     /naa total loan/
   ])) return "loan_total";
 
-  // 3. Active Loans
+  // 4. Active Loans
   if (hasAny(text, [
     /active loan/,
     /my active loans/,
@@ -86,7 +96,7 @@ const detectIntent = (message) => {
     /ప్రస్తుత రుణాలు/
   ]) && !text.includes("total") && !text.includes("balance") && !text.includes("remaining")) return "active_loans";
 
-  // 4. Next EMI / EMI Due Date
+  // 5. Next EMI / EMI Due Date
   if (hasAny(text, [
     /next emi/,
     /emi (due|date|when)/,
@@ -98,7 +108,7 @@ const detectIntent = (message) => {
     /next installment/
   ])) return "next_emi";
 
-  // 5. EMI Amount
+  // 6. EMI Amount
   if (hasAny(text, [
     /how much.*emi/,
     /emi amount/,
@@ -107,13 +117,13 @@ const detectIntent = (message) => {
     /my emi amount/
   ])) return "emi_amount";
 
-  // 6. EMI Details
+  // 7. EMI Details
   if (hasAny(text, [
     /emi detail/,
     /show emi/
   ])) return "emi_details";
 
-  // 7. Transactions / Payment History
+  // 8. Transactions / Payment History
   if (hasAny(text, [
     /transaction/,
     /payment history/,
@@ -124,14 +134,14 @@ const detectIntent = (message) => {
     /naa transactions/
   ])) return "transactions";
 
-  // 8. Subsidies
+  // 9. Subsidies
   if (hasAny(text, [
     /subsid(y|ies)/,
     /సబ్సిడీ/,
     /show.*subsid/
   ])) return "subsidies";
 
-  // 9. Notifications
+  // 10. Notifications
   if (hasAny(text, [
     /notification/,
     /alert/,
@@ -140,7 +150,7 @@ const detectIntent = (message) => {
     /show.*notification/
   ])) return "notifications";
 
-  // 10. Profile
+  // 11. Profile
   if (hasAny(text, [
     /profile/,
     /my detail/,
@@ -149,14 +159,14 @@ const detectIntent = (message) => {
     /ప్రొఫైల్/
   ])) return "profile";
 
-  // 11. Group ID
+  // 12. Group ID
   if (hasAny(text, [
     /group id/,
     /group number/,
     /గ్రూప్ ఐడి/
   ])) return "group_id";
 
-  // 12. Greetings
+  // 13. Greetings
   if (hasAny(text, [
     /\bhi\b/,
     /\bhello\b/,
@@ -181,38 +191,22 @@ const getAuthenticatedUser = async (authenticatedUser) => {
 // Data retrieval functions
 const fetchDataForIntent = async (intent, user) => {
   switch (intent) {
-    case "loan_total": {
-      const loans = await Loan.find({ memberId: user.userId, status: { $ne: "cancelled" } }).lean();
-      return { loans };
-    }
-
-    case "loan_balance": {
-      const loans = await Loan.find({ memberId: user.userId, status: { $in: ["active", "pending", "overdue"] } }).lean();
-      const txs = await Transaction.find({ memberId: user.userId, type: "loan_payment", status: "completed" }).lean();
-      const paidEmis = await Emi.find({ memberId: user.userId, status: "paid" }).lean();
-
-      const totalTxPaid = txs.reduce((sum, t) => sum + (t.amount || 0), 0);
-      const totalEmiPaid = paidEmis.reduce((sum, e) => sum + (e.amount || 0), 0);
-      const totalPaid = Math.max(totalTxPaid, totalEmiPaid);
-
-      return { loans, totalPaid };
-    }
-
+    case "loan_total":
+    case "paid_amount":
+    case "loan_balance":
     case "active_loans": {
-      const loans = await Loan.find({ memberId: user.userId, status: { $in: ["active", "pending", "overdue"] } }).lean();
-      return { loans };
+      return await getLoanSummary(user.userId);
     }
 
     case "next_emi":
     case "emi_amount":
     case "emi_due_date":
     case "emi_details": {
-      const emis = await Emi.find({ memberId: user.userId, status: { $in: ["pending", "overdue"] } }).sort({ dueDate: 1 }).lean();
-      return { emis };
+      return await getEmiSummary(user.userId);
     }
 
     case "transactions": {
-      return await Transaction.find({ memberId: user.userId }).sort({ paymentDate: -1 }).limit(5).lean();
+      return await Transaction.find({ memberId: user.userId }).sort({ paymentDate: -1 }).limit(10).lean();
     }
 
     case "subsidies": {
@@ -241,77 +235,85 @@ const constructResponse = (intent, data, language, user) => {
       : "Hello! I am your DWCRA assistant. I can help you with questions about your loans, EMIs, transactions, subsidies, notifications, and profile.";
   }
 
+  // EMI Intents
   if (["next_emi", "emi_amount", "emi_due_date", "emi_details"].includes(intent)) {
-    const emis = data ? data.emis || [] : [];
-    if (emis.length === 0) {
+    const emiSummary = data || {};
+    if (!emiSummary.hasEmis || emiSummary.unpaidEmisCount === 0) {
       return isTelugu ? "మీకు ప్రస్తుతం పెండింగ్ ఈఎంఐలు లేవు." : "You don't have any pending EMIs at the moment.";
     }
 
-    const now = new Date();
-    const overdueEmis = emis.filter(e => new Date(e.dueDate) < now);
-    const upcomingEmis = emis.filter(e => new Date(e.dueDate) >= now);
-
-    const primaryEmi = upcomingEmis.length > 0 ? upcomingEmis[0] : overdueEmis[0];
-    const isPrimaryOverdue = upcomingEmis.length === 0 && overdueEmis.length > 0;
-
-    const amount = primaryEmi.amount || 0;
-    const due = formatDate(primaryEmi.dueDate);
+    const nextUpcoming = emiSummary.nextUpcomingEmi;
+    const primaryOverdue = emiSummary.primaryOverdueEmi;
 
     if (intent === "emi_amount") {
+      const primary = nextUpcoming || primaryOverdue;
+      const amt = primary.amount || 0;
       return isTelugu
-        ? `మీ ఈఎంఐ మొత్తం ₹${amount.toLocaleString('en-IN')}.`
-        : `Your EMI amount is ₹${amount.toLocaleString('en-IN')}.`;
+        ? `మీ ఈఎంఐ మొత్తం ₹${amt.toLocaleString('en-IN')}.`
+        : `Your EMI amount is ₹${amt.toLocaleString('en-IN')}.`;
     }
 
-    if (isPrimaryOverdue) {
-      return isTelugu
-        ? `మీకు ₹${amount.toLocaleString('en-IN')} బకాయి (ఓవర్‌డ్యూ) ఈఎంఐ ఉంది, గడువు తేదీ ${due}.`
-        : `You have an overdue EMI of ₹${amount.toLocaleString('en-IN')}, which was due on ${due}.`;
-    } else {
+    if (nextUpcoming) {
+      const amt = nextUpcoming.amount || 0;
+      const due = formatDate(nextUpcoming.dueDate);
       let reply = isTelugu
-        ? `మీ తదుపరి ఈఎంఐ ₹${amount.toLocaleString('en-IN')}, గడువు తేదీ ${due}.`
-        : `Your next EMI is ₹${amount.toLocaleString('en-IN')}, due on ${due}.`;
+        ? `మీ తదుపరి ఈఎంఐ ₹${amt.toLocaleString('en-IN')}, గడువు తేదీ ${due}.`
+        : `Your next EMI is ₹${amt.toLocaleString('en-IN')}, due on ${due}.`;
 
-      if (overdueEmis.length > 0) {
-        const overdueTotal = overdueEmis.reduce((s, e) => s + (e.amount || 0), 0);
+      if (emiSummary.overdueEmisCount > 0 && primaryOverdue) {
         reply += isTelugu
-          ? ` (గమనిక: మీకు ₹${overdueTotal.toLocaleString('en-IN')} ఓవర్‌డ్యూ ఈఎంఐ బకాయి ఉంది.)`
-          : ` (Note: You also have an overdue EMI balance of ₹${overdueTotal.toLocaleString('en-IN')}).`;
+          ? ` (గమనిక: మీకు ${formatDate(primaryOverdue.dueDate)}న బకాయి ఉన్న ₹${primaryOverdue.amount.toLocaleString('en-IN')} ఈఎంఐ కూడా ఉంది).`
+          : ` (Note: You also have an overdue EMI of ₹${primaryOverdue.amount.toLocaleString('en-IN')} due on ${formatDate(primaryOverdue.dueDate)}).`;
       }
       return reply;
+    } else if (primaryOverdue) {
+      const amt = primaryOverdue.amount || 0;
+      const due = formatDate(primaryOverdue.dueDate);
+      return isTelugu
+        ? `మీకు ₹${amt.toLocaleString('en-IN')} బకాయి (ఓవర్‌డ్యూ) ఈఎంఐ ఉంది, గడువు తేదీ ${due}.`
+        : `You have an overdue EMI of ₹${amt.toLocaleString('en-IN')}, which was due on ${due}.`;
     }
   }
 
+  // Loan Intents
   if (intent === "loan_total") {
-    const loans = data ? data.loans || [] : [];
-    if (loans.length === 0) {
-      return isTelugu ? "మీకు ఎటువంటి రుణ రికార్డులు లేవు." : "You do not have any loan records.";
+    const loanSummary = data || {};
+    if (!loanSummary.hasLoans) {
+      return isTelugu
+        ? "మీ ఖాతా కోసం ఎటువంటి రుణ రికార్డులు కనుగొనబడలేదు."
+        : "I couldn't find any loan records for your account.";
     }
-    const total = loans.reduce((sum, l) => sum + (l.principalAmount || 0), 0);
     return isTelugu
-      ? `మీ మొత్తం రుణ మొత్తం ₹${total.toLocaleString('en-IN')}.`
-      : `Your total loan amount is ₹${total.toLocaleString('en-IN')}.`;
+      ? `మీ మొత్తం రుణ మొత్తం ₹${loanSummary.totalPrincipal.toLocaleString('en-IN')}.`
+      : `Your total loan amount is ₹${loanSummary.totalPrincipal.toLocaleString('en-IN')}.`;
+  }
+
+  if (intent === "paid_amount") {
+    const loanSummary = data || {};
+    return isTelugu
+      ? `మీరు మీ రుణ చెల్లింపుల కోసం మొత్తం ₹${loanSummary.totalPaid.toLocaleString('en-IN')} చెల్లించారు.`
+      : `You have paid a total of ₹${loanSummary.totalPaid.toLocaleString('en-IN')} towards your loan payments.`;
   }
 
   if (intent === "loan_balance") {
-    const loans = data ? data.loans || [] : [];
-    if (loans.length === 0) {
-      return isTelugu ? "మీకు ఎటువంటి మిగిలిన రుణ బకాయి లేదు." : "You do not have any remaining loan balance.";
+    const loanSummary = data || {};
+    if (!loanSummary.hasLoans || loanSummary.activeLoanCount === 0) {
+      return isTelugu
+        ? "మీకు ఎటువంటి మిగిలిన రుణ బకాయి లేదు."
+        : "You do not have any remaining loan balance.";
     }
-    const principal = loans.reduce((sum, l) => sum + (l.principalAmount || 0), 0);
-    const balance = Math.max(0, principal - (data.totalPaid || 0));
     return isTelugu
-      ? `మీ మిగిలిన రుణ బకాయి ₹${balance.toLocaleString('en-IN')}.`
-      : `Your remaining loan balance is ₹${balance.toLocaleString('en-IN')}.`;
+      ? `మీ మిగిలిన రుణ బకాయి ₹${loanSummary.remainingBalance.toLocaleString('en-IN')}.`
+      : `Your remaining loan balance is ₹${loanSummary.remainingBalance.toLocaleString('en-IN')}.`;
   }
 
   if (intent === "active_loans") {
-    const loans = data ? data.loans || [] : [];
-    if (loans.length === 0) {
+    const loanSummary = data || {};
+    if (!loanSummary.hasLoans || loanSummary.activeLoanCount === 0) {
       return isTelugu ? "మీకు ఎటువంటి క్రియాశీల రుణాలు లేవు." : "You don't have any active loans.";
     }
-    const loanCount = loans.length;
-    const loanDetails = loans
+    const loanCount = loanSummary.activeLoanCount;
+    const loanDetails = loanSummary.activeLoans
       .map(l => `${l.loanType || 'Loan'}: ₹${(l.principalAmount || 0).toLocaleString('en-IN')} (${l.status})`)
       .join("\n");
     return (isTelugu ? `మీకు ${loanCount} క్రియాశీల రుణాలు ఉన్నాయి:\n` : `You have ${loanCount} active loan(s):\n`) + loanDetails;
