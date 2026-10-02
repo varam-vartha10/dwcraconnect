@@ -5,7 +5,7 @@ try {
   execSync('git add .', { stdio: 'inherit' });
 
   console.log('2. Committing changes...');
-  execSync('git commit -m "Add leader group fallback in accountSummaryService for leader dashboard chatbot"', { stdio: 'inherit' });
+  execSync('git commit -m "Implement groupSummaryService, accountSummaryService, REST endpoints, and natural AI follow-up suggestions"', { stdio: 'inherit' });
 
   console.log('3. Pushing to origin main...');
   execSync('git push origin main', { stdio: 'inherit' });

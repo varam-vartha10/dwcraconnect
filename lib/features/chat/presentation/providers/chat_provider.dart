@@ -53,6 +53,7 @@ class ChatNotifier extends StateNotifier<ChatState> {
         text: result['reply'],
         type: MessageType.assistant,
         timestamp: DateTime.now(),
+        suggestions: List<String>.from(result['suggestions'] ?? []),
       );
 
       // 3. Update state with assistant response

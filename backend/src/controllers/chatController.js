@@ -37,6 +37,7 @@ const sendChatMessage = async (req, res) => {
     return res.status(200).json({
       success: true,
       reply: result.reply,
+      suggestions: result.suggestions || [],
       language: result.language,
       intent: result.intent,
       dataSource: result.dataSource

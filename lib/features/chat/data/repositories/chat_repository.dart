@@ -10,6 +10,7 @@ class ChatRepository {
       return {
         'reply': response['reply'],
         'language': response['language'],
+        'suggestions': List<String>.from(response['suggestions'] ?? []),
       };
     } else {
       throw Exception(response['message'] ?? 'Failed to get response from assistant');

@@ -27,6 +27,7 @@ const transactionRoutes = require("./routes/transactionRoutes");
 const subsidyRoutes = require("./routes/subsidyRoutes");
 const notificationRoutes = require("./routes/notificationRoutes");
 const chatRoutes = require("./routes/chatRoutes");
+const accountRoutes = require("./routes/accountRoutes");
 
 app.use("/api/auth", authRoutes);
 app.use("/api/users", userRoutes);
@@ -37,6 +38,7 @@ app.use("/api/transactions", transactionRoutes);
 app.use("/api/subsidies", subsidyRoutes);
 app.use("/api/notifications", notificationRoutes);
 app.use("/api/chat", chatRoutes);
+app.use("/api/account", accountRoutes);
 
 // Health Check
 app.get("/api/health", (req, res) => {
