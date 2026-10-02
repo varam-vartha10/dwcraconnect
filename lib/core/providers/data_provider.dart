@@ -12,6 +12,7 @@ import '../../domain/entities/emi_entity.dart';
 import '../../domain/entities/subsidy_entity.dart';
 import '../../domain/entities/notification_entity.dart';
 import '../../domain/entities/member_entity.dart';
+import '../../data/repositories/user_repository.dart';
 
 final emiRepositoryProvider = Provider<EmiRepository>((ref) => EmiRepository());
 final loanRepositoryProvider = Provider<LoanRepository>((ref) => LoanRepository());
@@ -22,8 +23,26 @@ final notificationRepositoryProvider = Provider<NotificationRepository>((ref) =>
 final membersProvider = FutureProvider<List<MemberEntity>>((ref) async {
   final user = ref.watch(authProvider).user;
   if (user == null) return [];
-  // For now returning empty or implementation for leader
-  return [];
+
+  if (user.role == UserRole.leader) {
+    return UserRepository.getGroupMembersSummary(user.groupId);
+  } else {
+    return [
+      MemberEntity(
+        id: user.id,
+        name: user.name,
+        mobile: user.phoneNumber,
+        aadhaar: user.aadhaar ?? '',
+        village: user.village ?? '',
+        shgGroup: user.groupId,
+        loanAmount: 0,
+        paidAmount: 0,
+        remainingAmount: 0,
+        emiAmount: 0,
+        subsidyAmount: 0,
+      )
+    ];
+  }
 });
 
 final currentMemberProvider = Provider<MemberEntity?>((ref) {

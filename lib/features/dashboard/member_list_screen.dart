@@ -70,13 +70,15 @@ class _MemberListScreenState extends ConsumerState<MemberListScreen> {
           Expanded(
             child: membersAsync.when(
               data: (members) {
+                final query = _searchController.text.toLowerCase();
                 final filteredMembers = members.where((m) => 
-                  m.name.toLowerCase().contains(_searchController.text.toLowerCase()) ||
-                  m.id.toLowerCase().contains(_searchController.text.toLowerCase())
+                  m.name.toLowerCase().contains(query) ||
+                  m.id.toLowerCase().contains(query) ||
+                  m.mobile.contains(query)
                 ).toList();
 
                 if (filteredMembers.isEmpty) {
-                  return Center(child: Text(l10n.noRecentActivity));
+                  return const Center(child: Text('No members found'));
                 }
 
                 return ListView.separated(

@@ -1,6 +1,7 @@
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/user_model.dart';
 import '../../domain/entities/user_entity.dart';
+import '../../domain/entities/member_entity.dart';
 import '../../core/network/api_service.dart';
 
 class UserRepository {
@@ -128,6 +129,48 @@ class UserRepository {
           ),
         )
         .toList();
+  }
+
+  static Future<List<MemberEntity>> getGroupMembersSummary(String groupId) async {
+    try {
+      final response = await ApiService.get('/account/groups/$groupId/members/summary');
+      
+      if (response['success'] == true && response['members'] != null) {
+        final List membersJson = response['members'];
+        return membersJson.map((json) {
+          final data = Map<String, dynamic>.from(json);
+          return MemberEntity(
+            id: data['userId'] ?? '',
+            name: data['name'] ?? '',
+            mobile: data['phoneNumber'] ?? '',
+            aadhaar: data['aadhaar'] ?? 'XXXX-XXXX-XXXX',
+            village: data['village'] ?? '',
+            shgGroup: groupId,
+            loanAmount: (data['totalPrincipal'] as num?)?.toDouble() ?? 0.0,
+            paidAmount: (data['totalPaid'] as num?)?.toDouble() ?? 0.0,
+            remainingAmount: (data['remainingBalance'] as num?)?.toDouble() ?? 0.0,
+            emiAmount: (data['nextEmiAmount'] as num?)?.toDouble() ?? 0.0,
+            subsidyAmount: (data['subsidyAmount'] as num?)?.toDouble() ?? 0.0,
+          );
+        }).toList();
+      }
+    } catch (_) {}
+
+    // Fallback to basic user fetching if summary fails
+    final users = await getUsersByGroup(groupId);
+    return users.map((u) => MemberEntity(
+      id: u.userId,
+      name: u.name,
+      mobile: u.phoneNumber,
+      aadhaar: u.aadhaar ?? '',
+      village: u.village ?? '',
+      shgGroup: u.groupId,
+      loanAmount: 0,
+      paidAmount: 0,
+      remainingAmount: 0,
+      emiAmount: 0,
+      subsidyAmount: 0,
+    )).toList();
   }
 
   static UserRole _parseRole(String? role) {
