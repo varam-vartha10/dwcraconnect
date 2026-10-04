@@ -20,7 +20,6 @@ class ApiService {
 
   // Simple in-memory cache for the token to improve performance
   static String? _cachedToken;
-
   static void setToken(String? token) {
     _cachedToken = token;
   }
