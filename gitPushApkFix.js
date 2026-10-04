@@ -5,7 +5,7 @@ try {
   execSync('git add .', { stdio: 'inherit' });
 
   console.log('2. Committing changes...');
-  execSync('git commit -m "Fix Android launcher icon safe-zone scaling and adaptive layer foreground padding"', { stdio: 'inherit' });
+  execSync('git commit -m "Fix release APK android.permission.INTERNET and membersProvider integration"', { stdio: 'inherit' });
 
   console.log('3. Pushing to origin main...');
   execSync('git push origin main', { stdio: 'inherit' });
