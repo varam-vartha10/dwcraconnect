@@ -1,5 +1,5 @@
 const Emi = require("../models/Emi");
-const { processEmiPayment } = require("../services/financialService");
+const { processEmiPayment, getEmiSummary } = require("../services/financialService");
 
 const getEmis = async (req, res) => {
   try {
@@ -17,12 +17,14 @@ const getEmis = async (req, res) => {
 
     if (status) filter.status = status;
 
-    const emis = await Emi.find(filter).sort({ dueDate: 1 }).lean();
+    const summary = await getEmiSummary(role === "member" ? userId : (memberId || userId));
 
     res.status(200).json({
       success: true,
-      count: emis.length,
-      emis,
+      count: summary.emis.length,
+      emis: summary.emis,
+      overdueCount: summary.overdueEmisCount,
+      nextEmi: summary.nextUpcomingEmi,
     });
   } catch (error) {
     res.status(500).json({
@@ -35,7 +37,7 @@ const getEmis = async (req, res) => {
 const payEmi = async (req, res) => {
   try {
     const { emiId, amount, notes } = req.body;
-    const { userId, groupId } = req.user;
+    const { userId, groupId, role } = req.user;
 
     if (!emiId) {
       return res.status(400).json({ success: false, message: "emiId is required" });
@@ -48,17 +50,23 @@ const payEmi = async (req, res) => {
       amount,
       paymentDate: new Date(),
       notes,
+      userRole: role,
     });
 
     res.status(200).json({
       success: true,
-      message: "EMI payment recorded successfully",
+      message: result.message,
       emi: result.emi,
       transaction: result.transaction,
+      remainingBalance: result.remainingBalance,
+      totalPaid: result.totalPaid,
+      nextEmi: result.nextEmi,
+      unpaidEmisCount: result.unpaidEmisCount,
     });
   } catch (error) {
     console.error("Pay EMI error:", error.message);
-    res.status(400).json({
+    const statusCode = error.message.includes("Unauthorized") ? 403 : 400;
+    res.status(statusCode).json({
       success: false,
       message: error.message || "Failed to process EMI payment",
     });

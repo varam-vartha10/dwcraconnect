@@ -1,3 +1,4 @@
+const mongoose = require("mongoose");
 const Loan = require("../models/Loan");
 const Emi = require("../models/Emi");
 const Transaction = require("../models/Transaction");
@@ -8,6 +9,26 @@ const Notification = require("../models/Notification");
  * Reusable Financial Calculation Service
  * Central source of truth for both Dashboard APIs and Chatbot API
  */
+
+// Helper to compute date-based EMI status
+const computeEmiStatus = (emi, now = new Date()) => {
+  if (emi.status === "paid" || emi.status === "waived") {
+    return emi.status;
+  }
+  const dueDate = new Date(emi.dueDate);
+  const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+
+  if (dueDate < startOfToday) {
+    return "overdue";
+  } else if (
+    dueDate.getFullYear() === now.getFullYear() &&
+    dueDate.getMonth() === now.getMonth() &&
+    dueDate.getDate() === now.getDate()
+  ) {
+    return "due";
+  }
+  return "pending";
+};
 
 // 1. Get Loan Summary
 const getLoanSummary = async (userId) => {
@@ -39,16 +60,23 @@ const getLoanSummary = async (userId) => {
 
 // 2. Get EMI Summary
 const getEmiSummary = async (userId) => {
-  const emis = await Emi.find({ memberId: userId }).sort({ dueDate: 1 }).lean();
+  const rawEmis = await Emi.find({ memberId: userId }).sort({ dueDate: 1 }).lean();
   const now = new Date();
+
+  // Attach computed date-based status
+  const emis = rawEmis.map(e => ({
+    ...e,
+    computedStatus: computeEmiStatus(e, now),
+  }));
 
   const paidEmis = emis.filter(e => e.status === "paid");
   const unpaidEmis = emis.filter(e => e.status !== "paid");
 
-  const overdueEmis = unpaidEmis.filter(e => new Date(e.dueDate) < now);
-  const upcomingEmis = unpaidEmis.filter(e => new Date(e.dueDate) >= now);
+  const overdueEmis = unpaidEmis.filter(e => e.computedStatus === "overdue");
+  const dueTodayEmis = unpaidEmis.filter(e => e.computedStatus === "due");
+  const upcomingEmis = unpaidEmis.filter(e => e.computedStatus === "pending" || e.computedStatus === "due");
 
-  const nextUpcomingEmi = upcomingEmis.length > 0 ? upcomingEmis[0] : null;
+  const nextUpcomingEmi = upcomingEmis.length > 0 ? upcomingEmis[0] : (unpaidEmis.length > 0 ? unpaidEmis[0] : null);
   const primaryOverdueEmi = overdueEmis.length > 0 ? overdueEmis[0] : null;
 
   const totalUnpaidAmount = unpaidEmis.reduce((sum, e) => sum + (e.amount || 0), 0);
@@ -60,6 +88,7 @@ const getEmiSummary = async (userId) => {
     paidEmisCount: paidEmis.length,
     unpaidEmisCount: unpaidEmis.length,
     overdueEmisCount: overdueEmis.length,
+    dueTodayEmisCount: dueTodayEmis.length,
     upcomingEmisCount: upcomingEmis.length,
     nextUpcomingEmi,
     primaryOverdueEmi,
@@ -73,45 +102,108 @@ const getEmiSummary = async (userId) => {
   };
 };
 
-// 3. Process EMI Payment (Atomic payment lifecycle execution)
-const processEmiPayment = async ({ memberId, groupId, emiId, amount, paymentDate = new Date(), notes = "" }) => {
-  const emi = await Emi.findOne({ emiId, memberId });
+// 3. Process EMI Payment (Atomic, Transaction-Safe Payment Lifecycle Execution)
+const processEmiPayment = async ({
+  memberId,
+  groupId,
+  emiId,
+  amount,
+  paymentDate = new Date(),
+  notes = "",
+  userRole = "member",
+}) => {
+  if (!emiId) {
+    throw new Error("emiId is required");
+  }
+
+  // 1. Find EMI
+  const emi = await Emi.findOne({ emiId });
   if (!emi) {
     throw new Error("EMI record not found");
   }
 
-  if (emi.status === "paid") {
-    throw new Error("EMI is already paid");
+  // 2. Ownership & Authorization Check
+  if (userRole === "member" && emi.memberId !== memberId) {
+    throw new Error("Unauthorized: You can only pay EMIs for your own account.");
   }
 
-  // Mark EMI as paid
-  emi.status = "paid";
-  emi.paidDate = paymentDate;
-  await emi.save();
+  if (userRole === "leader" && groupId && emi.groupId !== groupId) {
+    throw new Error("Unauthorized: Cannot process payment for another group.");
+  }
 
-  // Create permanent transaction record
-  const transactionId = `TXN-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
-  const transaction = await Transaction.create({
-    transactionId,
-    loanId: emi.loanId,
-    emiId: emi.emiId,
-    memberId,
-    groupId,
-    amount: amount || emi.amount,
-    type: "loan_payment",
-    status: "completed",
-    paymentDate,
-    notes: notes || `EMI installment #${emi.installmentNumber} payment`,
-  });
+  // 3. Double Payment Protection
+  if (emi.status === "paid") {
+    throw new Error("This EMI has already been paid.");
+  }
 
-  return {
-    success: true,
-    emi,
-    transaction,
-  };
+  // 4. Payment Amount Validation
+  const payableAmount = emi.amount;
+  const submittedAmount = Number(amount);
+
+  if (isNaN(submittedAmount) || submittedAmount <= 0) {
+    throw new Error("Invalid payment amount. Amount must be greater than zero.");
+  }
+
+  if (Math.abs(submittedAmount - payableAmount) > 0.01) {
+    throw new Error(`Invalid payment amount. Submitted ₹${submittedAmount}, but required EMI amount is ₹${payableAmount}.`);
+  }
+
+  // 5. Transaction-Safe Database Execution using Session
+  const session = await mongoose.startSession();
+  try {
+    session.startTransaction();
+
+    // Mark EMI as paid
+    emi.status = "paid";
+    emi.paidDate = paymentDate;
+    await emi.save({ session });
+
+    // Create permanent transaction record
+    const transactionId = `TXN-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+    const [transaction] = await Transaction.create(
+      [
+        {
+          transactionId,
+          loanId: emi.loanId,
+          emiId: emi.emiId,
+          memberId: emi.memberId,
+          groupId: emi.groupId || groupId,
+          amount: payableAmount,
+          type: "loan_payment",
+          status: "completed",
+          paymentDate,
+          notes: notes || `EMI installment #${emi.installmentNumber} payment`,
+        },
+      ],
+      { session }
+    );
+
+    await session.commitTransaction();
+    session.endSession();
+
+    // Fetch updated post-payment account summaries
+    const updatedLoanSummary = await getLoanSummary(emi.memberId);
+    const updatedEmiSummary = await getEmiSummary(emi.memberId);
+
+    return {
+      success: true,
+      message: "EMI payment successfully confirmed.",
+      emi: emi.toObject ? emi.toObject() : emi,
+      transaction: transaction.toObject ? transaction.toObject() : transaction,
+      remainingBalance: updatedLoanSummary.remainingBalance,
+      totalPaid: updatedLoanSummary.totalPaid,
+      nextEmi: updatedEmiSummary.nextUpcomingEmi,
+      unpaidEmisCount: updatedEmiSummary.unpaidEmisCount,
+    };
+  } catch (error) {
+    await session.abortTransaction();
+    session.endSession();
+    throw error;
+  }
 };
 
 module.exports = {
+  computeEmiStatus,
   getLoanSummary,
   getEmiSummary,
   processEmiPayment,
