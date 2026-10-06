@@ -1,13 +1,14 @@
 const Notification = require("../models/Notification");
+const {
+  getMemberNotifications,
+  syncMemberNotifications,
+} = require("../services/notificationService");
 
 const getNotifications = async (req, res) => {
   try {
     const { userId, groupId: userGroupId } = req.user;
 
-    const notifications = await Notification.find({
-      memberId: userId,
-      groupId: userGroupId
-    }).sort({ createdAt: -1 }).limit(20).lean();
+    const notifications = await getMemberNotifications(userId, userGroupId, 20);
 
     res.status(200).json({
       success: true,
@@ -15,7 +16,29 @@ const getNotifications = async (req, res) => {
       notifications,
     });
   } catch (error) {
+    console.error("Get notifications error:", error.message);
     res.status(500).json({ success: false, message: "Failed to fetch notifications" });
+  }
+};
+
+const syncNotifications = async (req, res) => {
+  try {
+    const { userId, groupId: userGroupId } = req.user;
+
+    await syncMemberNotifications(userId, userGroupId);
+    const notifications = await Notification.find({ memberId: userId })
+      .sort({ createdAt: -1 })
+      .limit(20)
+      .lean();
+
+    res.status(200).json({
+      success: true,
+      count: notifications.length,
+      notifications,
+    });
+  } catch (error) {
+    console.error("Sync notifications error:", error.message);
+    res.status(500).json({ success: false, message: "Failed to sync notifications" });
   }
 };
 
@@ -68,7 +91,7 @@ const createNotification = async (req, res) => {
       groupId,
       title,
       message,
-      type,
+      type: type || "general",
       relatedId,
     });
 
@@ -78,7 +101,7 @@ const createNotification = async (req, res) => {
       notification,
     });
   } catch (error) {
-    console.error("Create notification error:", error);
+    console.error("Create notification error:", error.message);
     res.status(500).json({
       success: false,
       message: "Failed to create notification",
@@ -88,19 +111,27 @@ const createNotification = async (req, res) => {
 
 const markAsRead = async (req, res) => {
   try {
-    const { notificationId } = req.params;
+    const { id } = req.params; // notificationId
+    const { userId } = req.user;
+
     await Notification.updateOne(
-      { notificationId, memberId: req.user.userId },
+      { notificationId: id, memberId: userId },
       { $set: { isRead: true } }
     );
-    res.status(200).json({ success: true });
+
+    res.status(200).json({
+      success: true,
+      message: "Notification marked as read",
+    });
   } catch (error) {
+    console.error("Mark as read error:", error.message);
     res.status(500).json({ success: false, message: "Failed to mark as read" });
   }
 };
 
 module.exports = {
   getNotifications,
+  syncNotifications,
   createNotification,
   markAsRead,
 };

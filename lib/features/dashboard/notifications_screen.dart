@@ -19,15 +19,9 @@ class NotificationsScreen extends ConsumerWidget {
         actions: [
           TextButton(
             onPressed: () {
-              // Implementation for marking all read via API could go here
+              ref.invalidate(notificationsProvider);
             },
-            child: Text(
-              l10n.markAllRead,
-              style: const TextStyle(
-                color: Colors.white,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
+            child: const Icon(Icons.refresh_rounded, color: Colors.white),
           ),
         ],
       ),
@@ -73,16 +67,31 @@ class NotificationsScreen extends ConsumerWidget {
     IconData categoryIcon;
 
     switch (n.category) {
+      case 'emi_upcoming':
       case 'emi_reminder':
-        categoryColor = AppColors.secondaryPink;
+        categoryColor = AppColors.shgTeal;
         categoryIcon = Icons.event_note_rounded;
         break;
+      case 'emi_due':
+        categoryColor = AppColors.harvestGold;
+        categoryIcon = Icons.warning_amber_rounded;
+        break;
+      case 'emi_overdue':
+        categoryColor = AppColors.lotusPink;
+        categoryIcon = Icons.error_outline_rounded;
+        break;
+      case 'payment_success':
+      case 'payment_confirmation':
+        categoryColor = AppColors.fieldGreen;
+        categoryIcon = Icons.check_circle_outline_rounded;
+        break;
+      case 'subsidy_update':
       case 'gov_scheme':
-        categoryColor = AppColors.successGreen;
-        categoryIcon = Icons.account_balance_rounded;
+        categoryColor = AppColors.fieldGreen;
+        categoryIcon = Icons.savings_rounded;
         break;
       case 'loan_update':
-        categoryColor = AppColors.trustBlue;
+        categoryColor = AppColors.indigo;
         categoryIcon = Icons.monetization_on_rounded;
         break;
       default:
@@ -113,7 +122,7 @@ class NotificationsScreen extends ConsumerWidget {
                   width: 12,
                   height: 12,
                   decoration: BoxDecoration(
-                    color: AppColors.secondaryPink,
+                    color: AppColors.lotusPink,
                     shape: BoxShape.circle,
                     border: Border.all(color: Colors.white, width: 2),
                   ),
@@ -148,8 +157,12 @@ class NotificationsScreen extends ConsumerWidget {
             ),
           ],
         ),
-        onTap: () {
-          // Implementation for marking individual read via API could go here
+        onTap: () async {
+          if (!n.isRead) {
+            n.isRead = true;
+            await ref.read(notificationRepositoryProvider).markAsRead(n.id);
+            ref.invalidate(notificationsProvider);
+          }
         },
       ),
     );

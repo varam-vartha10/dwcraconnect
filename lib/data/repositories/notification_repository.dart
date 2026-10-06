@@ -18,6 +18,15 @@ class NotificationRepository {
     return [];
   }
 
+  Future<bool> markAsRead(String notificationId) async {
+    try {
+      final response = await ApiService.patch('/notifications/$notificationId/read', {});
+      return response['success'] == true;
+    } catch (_) {
+      return false;
+    }
+  }
+
   String _formatTime(DateTime dt) {
     return "${dt.day}/${dt.month}/${dt.year}";
   }

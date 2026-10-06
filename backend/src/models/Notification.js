@@ -37,15 +37,25 @@ const notificationSchema = new mongoose.Schema(
     type: {
       type: String,
       enum: [
+        "emi_upcoming",
+        "emi_due",
+        "emi_overdue",
+        "payment_success",
         "emi_reminder",
         "payment_confirmation",
         "loan_update",
         "subsidy_update",
         "group_notification",
+        "general",
         "other"
       ],
-      default: "other",
+      default: "general",
       index: true,
+    },
+
+    stage: {
+      type: String,
+      default: null, // "7_days", "3_days", "1_day", "due_today", "overdue", "payment_success"
     },
 
     isRead: {
@@ -63,5 +73,8 @@ const notificationSchema = new mongoose.Schema(
     timestamps: true,
   }
 );
+
+// Compound index for fast lookup of member notifications
+notificationSchema.index({ memberId: 1, createdAt: -1 });
 
 module.exports = mongoose.model("Notification", notificationSchema);

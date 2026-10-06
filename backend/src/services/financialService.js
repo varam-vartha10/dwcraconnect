@@ -4,6 +4,7 @@ const Emi = require("../models/Emi");
 const Transaction = require("../models/Transaction");
 const Subsidy = require("../models/Subsidy");
 const Notification = require("../models/Notification");
+const { createPaymentSuccessNotification } = require("./notificationService");
 
 /**
  * Reusable Financial Calculation Service
@@ -177,6 +178,16 @@ const processEmiPayment = async ({
       ],
       { session }
     );
+
+    // Create payment success notification
+    await createPaymentSuccessNotification({
+      memberId: emi.memberId,
+      groupId: emi.groupId || groupId,
+      emi,
+      transactionId,
+      amount: payableAmount,
+      session,
+    });
 
     await session.commitTransaction();
     session.endSession();
