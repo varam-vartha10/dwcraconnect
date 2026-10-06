@@ -16,6 +16,7 @@ class ChatScreen extends ConsumerStatefulWidget {
 class _ChatScreenState extends ConsumerState<ChatScreen> {
   final TextEditingController _controller = TextEditingController();
   final ScrollController _scrollController = ScrollController();
+  bool _isListening = false;
 
   @override
   void dispose() {
@@ -36,15 +37,71 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     });
   }
 
-  void _handleSend() {
+  void _handleSend({String inputMode = 'chat'}) {
     final chatState = ref.read(chatProvider);
     if (chatState.isLoading) return;
 
     final text = _controller.text.trim();
     if (text.isNotEmpty) {
-      ref.read(chatProvider.notifier).sendMessage(text);
+      if (_isListening) {
+        _stopListening();
+      }
+      ref.read(chatProvider.notifier).sendMessage(text, inputMode: inputMode);
       _controller.clear();
       _scrollToBottom();
+    }
+  }
+
+  Future<void> _toggleListening() async {
+    final speechService = ref.read(speechServiceProvider);
+
+    if (_isListening) {
+      await _stopListening();
+      if (_controller.text.trim().isNotEmpty) {
+        _handleSend(inputMode: 'voice');
+      }
+    } else {
+      final available = await speechService.initialize();
+      if (!available) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Microphone permission or speech recognition not available')),
+          );
+        }
+        return;
+      }
+
+      setState(() {
+        _isListening = true;
+      });
+
+      await speechService.startListening(
+        onResult: (text, isFinal) {
+          if (mounted) {
+            setState(() {
+              _controller.text = text;
+            });
+            if (isFinal) {
+              setState(() {
+                _isListening = false;
+              });
+              if (text.trim().isNotEmpty) {
+                _handleSend(inputMode: 'voice');
+              }
+            }
+          }
+        },
+      );
+    }
+  }
+
+  Future<void> _stopListening() async {
+    final speechService = ref.read(speechServiceProvider);
+    await speechService.stopListening();
+    if (mounted) {
+      setState(() {
+        _isListening = false;
+      });
     }
   }
 
@@ -339,15 +396,31 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                 child: TextField(
                   controller: _controller,
                   decoration: InputDecoration(
-                    hintText: l10n.typeQuestionHint,
+                    hintText: _isListening ? 'Listening...' : l10n.typeQuestionHint,
                     border: InputBorder.none,
                     contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
                   ),
-                  onSubmitted: (_) => _handleSend(),
+                  onSubmitted: (_) => _handleSend(inputMode: 'chat'),
                 ),
               ),
             ),
             const SizedBox(width: 8),
+            // Microphone Button
+            Container(
+              decoration: BoxDecoration(
+                color: _isListening ? Colors.redAccent : AppColors.primaryPurple.withValues(alpha: 0.1),
+                shape: BoxShape.circle,
+              ),
+              child: IconButton(
+                icon: Icon(
+                  _isListening ? Icons.mic_rounded : Icons.mic_none_rounded,
+                  color: _isListening ? Colors.white : AppColors.primaryPurple,
+                ),
+                onPressed: _toggleListening,
+              ),
+            ),
+            const SizedBox(width: 8),
+            // Send Button
             Container(
               decoration: const BoxDecoration(
                 color: AppColors.primaryPurple,
@@ -355,7 +428,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
               ),
               child: IconButton(
                 icon: const Icon(Icons.send_rounded, color: Colors.white),
-                onPressed: _handleSend,
+                onPressed: () => _handleSend(inputMode: 'chat'),
               ),
             ),
           ],

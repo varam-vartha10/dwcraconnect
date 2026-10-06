@@ -32,6 +32,10 @@ dependencies:
 
   http: ^1.5.0
   
+  # Speech & Audio
+  speech_to_text: ^7.0.0
+  flutter_tts: ^4.2.0
+  
   # Icons & UI
   cupertino_icons: ^1.0.8
 
