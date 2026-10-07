@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:dwcra_connect/l10n/app_localizations.dart';
+import 'package:intl/intl.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/providers/auth_provider.dart';
 import '../../core/providers/data_provider.dart';
+import '../../domain/entities/transaction_entity.dart';
 import '../../domain/entities/user_entity.dart';
 
 class TransactionHistoryScreen extends ConsumerStatefulWidget {
@@ -44,8 +46,8 @@ class _TransactionHistoryScreenState
         title: Text(l10n.transactionHistory),
         actions: [
           IconButton(
-            icon: const Icon(Icons.picture_as_pdf_rounded),
-            onPressed: () {},
+            icon: const Icon(Icons.refresh_rounded),
+            onPressed: () => ref.invalidate(transactionsProvider),
           ),
         ],
       ),
@@ -137,10 +139,13 @@ class _TransactionHistoryScreenState
               data: (transactions) {
                 final filteredTransactions = transactions.where((tx) {
                   final matchesSearch = tx.description.toLowerCase().contains(
-                    _searchController.text.toLowerCase(),
-                  );
-                  final matchesFilter =
-                      _selectedFilter == 'all' || tx.type.toLowerCase() == _selectedFilter;
+                        _searchController.text.toLowerCase(),
+                      ) ||
+                      tx.transactionId.toLowerCase().contains(
+                        _searchController.text.toLowerCase(),
+                      );
+                  final matchesFilter = _selectedFilter == 'all' ||
+                      tx.type.toLowerCase() == _selectedFilter;
                   return matchesSearch && matchesFilter;
                 }).toList();
 
@@ -150,51 +155,57 @@ class _TransactionHistoryScreenState
 
                 return ListView.separated(
                   itemCount: filteredTransactions.length,
-                  separatorBuilder: (context, index) => const Divider(height: 1),
+                  separatorBuilder: (context, index) =>
+                      const Divider(height: 1),
                   itemBuilder: (context, index) {
                     final tx = filteredTransactions[index];
                     final isCredit = tx.type == 'Credit';
 
-                    return Padding(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 24,
-                        vertical: 16,
-                      ),
-                      child: Row(
-                        children: [
-                          Expanded(
-                            flex: 2,
-                            child: Text(
-                              "${tx.date.day} ${_getMonth(tx.date.month)} ${tx.date.year}",
-                              style: const TextStyle(
-                                fontSize: 13,
-                                color: AppColors.textSecondary,
-                              ),
-                            ),
-                          ),
-                          Expanded(
-                            flex: 3,
-                            child: Text(
-                              tx.description,
-                              style: const TextStyle(fontWeight: FontWeight.w600),
-                            ),
-                          ),
-                          Expanded(
-                            flex: 2,
-                            child: Align(
-                              alignment: Alignment.centerRight,
+                    return InkWell(
+                      onTap: () => _showTransactionDetailsSheet(context, tx),
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 24,
+                          vertical: 16,
+                        ),
+                        child: Row(
+                          children: [
+                            Expanded(
+                              flex: 2,
                               child: Text(
-                                '${isCredit ? '+' : '-'} ₹${tx.amount.toInt().abs()}',
-                                style: TextStyle(
-                                  fontWeight: FontWeight.bold,
-                                  color: isCredit
-                                      ? AppColors.successGreen
-                                      : Colors.redAccent,
+                                DateFormat('dd MMM yyyy').format(tx.date),
+                                style: const TextStyle(
+                                  fontSize: 13,
+                                  color: AppColors.textSecondary,
                                 ),
                               ),
                             ),
-                          ),
-                        ],
+                            Expanded(
+                              flex: 3,
+                              child: Text(
+                                tx.description,
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ),
+                            Expanded(
+                              flex: 2,
+                              child: Align(
+                                alignment: Alignment.centerRight,
+                                child: Text(
+                                  '${isCredit ? '+' : '-'} ₹${tx.amount.toInt().abs()}',
+                                  style: TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    color: isCredit
+                                        ? AppColors.fieldGreen
+                                        : Colors.redAccent,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
                     );
                   },
@@ -209,21 +220,132 @@ class _TransactionHistoryScreenState
     );
   }
 
-  String _getMonth(int month) {
-    const months = [
-      'Jan',
-      'Feb',
-      'Mar',
-      'Apr',
-      'May',
-      'Jun',
-      'Jul',
-      'Aug',
-      'Sep',
-      'Oct',
-      'Nov',
-      'Dec',
-    ];
-    return months[month - 1];
+  void _showTransactionDetailsSheet(
+    BuildContext context,
+    TransactionEntity tx,
+  ) {
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (ctx) => Padding(
+        padding: const EdgeInsets.fromLTRB(24, 24, 24, 32),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Center(
+              child: Container(
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: Colors.grey.shade300,
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+            ),
+            const SizedBox(height: 20),
+            const Text(
+              'Transaction Statement Details',
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+                color: AppColors.primaryPurple,
+              ),
+            ),
+            const SizedBox(height: 16),
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: AppColors.background,
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: Colors.black12),
+              ),
+              child: Column(
+                children: [
+                  _buildDetailRow(
+                    'Transaction ID',
+                    tx.transactionId.isNotEmpty ? tx.transactionId : 'N/A',
+                  ),
+                  const Divider(height: 16),
+                  _buildDetailRow(
+                    'Payment Date',
+                    DateFormat('dd MMM yyyy, hh:mm a').format(tx.date),
+                  ),
+                  const Divider(height: 16),
+                  _buildDetailRow('Description', tx.description),
+                  if (tx.installmentNumber != null) ...[
+                    const Divider(height: 16),
+                    _buildDetailRow('Installment', '#${tx.installmentNumber}'),
+                  ],
+                  if (tx.loanId.isNotEmpty) ...[
+                    const Divider(height: 16),
+                    _buildDetailRow('Loan Reference', tx.loanId),
+                  ],
+                  const Divider(height: 16),
+                  _buildDetailRow(
+                    'Status',
+                    tx.status.toUpperCase(),
+                    color: AppColors.fieldGreen,
+                  ),
+                  const Divider(height: 16),
+                  _buildDetailRow(
+                    'Amount',
+                    '₹${tx.amount.toStringAsFixed(2)}',
+                    isBold: true,
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 24),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.primaryPurple,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+                onPressed: () => Navigator.pop(ctx),
+                child: const Text(
+                  'Close',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildDetailRow(
+    String label,
+    String value, {
+    Color? color,
+    bool isBold = false,
+  }) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Text(
+          label,
+          style: const TextStyle(color: AppColors.textSecondary, fontSize: 13),
+        ),
+        Text(
+          value,
+          style: TextStyle(
+            fontWeight: isBold ? FontWeight.bold : FontWeight.w600,
+            fontSize: isBold ? 15 : 13,
+            color: color ?? AppColors.textPrimary,
+          ),
+        ),
+      ],
+    );
   }
 }
