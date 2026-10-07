@@ -41,4 +41,22 @@ class EmiRepository {
       throw Exception(response['message'] ?? 'Failed to load EMIs');
     }
   }
+
+  Future<Map<String, dynamic>> payEmi({
+    required String emiId,
+    required double amount,
+    String? notes,
+  }) async {
+    final response = await ApiService.post('/emis/pay', {
+      'emiId': emiId,
+      'amount': amount,
+      if (notes != null && notes.isNotEmpty) 'notes': notes,
+    });
+
+    if (response['success'] == true) {
+      return Map<String, dynamic>.from(response);
+    } else {
+      throw Exception(response['message'] ?? 'EMI payment failed');
+    }
+  }
 }
