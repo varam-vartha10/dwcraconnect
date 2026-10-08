@@ -1,5 +1,6 @@
 const OpenAI = require("openai");
 const User = require("../models/User");
+const Subsidy = require("../models/Subsidy");
 const {
   getMyLoanSummary,
   getMyEmiSummary,
@@ -17,6 +18,21 @@ class ChatServiceError extends Error {
     this.statusCode = statusCode;
   }
 }
+
+// Short-term conversation context store (In-memory, session-scoped per user)
+const conversationContextStore = new Map();
+
+const getStoredContext = (userId) => {
+  return conversationContextStore.get(userId) || null;
+};
+
+const updateStoredContext = (userId, intent, scope) => {
+  conversationContextStore.set(userId, {
+    lastIntent: intent,
+    lastScope: scope,
+    updatedAt: Date.now(),
+  });
+};
 
 const formatDate = (value) => {
   if (!value) return null;
@@ -48,14 +64,65 @@ const hasAny = (text, patterns) => {
   });
 };
 
-const detectIntent = (message) => {
+/**
+ * Robust Intent Classification Layer
+ */
+const detectIntent = (message, previousContext = null) => {
   const text = message
     .toLowerCase()
     .trim()
     .replace(/[.,?!;:()"'']/g, "")
     .replace(/\s+/g, " ");
 
-  // 1. Group Specific Queries
+  // --- 1. MULTI-TURN CONTEXTUAL FOLLOW-UPS ---
+  if (previousContext) {
+    const lastIntent = previousContext.lastIntent;
+
+    // Follow-up: "What about the overdue one?"
+    if (hasAny(text, [/overdue/, /pending/]) && (lastIntent === "personal_next_emi" || lastIntent === "personal_emi_summary")) {
+      return "personal_overdue_emi";
+    }
+
+    // Follow-up: "How much is left?" / "What is left?"
+    if (hasAny(text, [/what is left/, /how much is left/, /left/, /remaining/, /balance/]) && (lastIntent === "personal_loan_total" || lastIntent === "personal_loan_paid")) {
+      return "personal_loan_remaining";
+    }
+
+    // Follow-up: "How much is still pending?" (Group context)
+    if (hasAny(text, [/pending/, /outstanding/, /remaining/]) && lastIntent === "group_loan_total") {
+      return "group_outstanding_total";
+    }
+
+    // Follow-up: "How much did I pay?"
+    if (hasAny(text, [/paid/, /pay/, /how much/]) && lastIntent === "personal_loan_total") {
+      return "personal_loan_paid";
+    }
+  }
+
+  // --- 2. GROUP INTENTS (Leader Authorized) ---
+
+  // Group Subsidy Total (Fixed Bug)
+  if (hasAny(text, [
+    /group.*subsidy/,
+    /our group.*subsidy/,
+    /subsidy.*(group|our group)/,
+    /how much subsidy.*(group|our group)/,
+    /total subsidy.*(group|our group)/,
+    /group subsidy entha/,
+    /mana group.*subsidy/,
+    /సబ్సిడీ.*గ్రూప్/
+  ])) return "group_subsidy_total";
+
+  // Group Subsidy Member Breakdown
+  if (hasAny(text, [
+    /who.*received.*subsidy/,
+    /which members.*subsidy/,
+    /members.*got.*subsidy/,
+    /evariki subsidy vachindi/,
+    /సబ్సిడీ పొందిన సభ్యులు/
+  ])) return "group_subsidy_members";
+
+  // Group Members Count
   if (hasAny(text, [
     /how many members.*group/,
     /members.*in.*group/,
@@ -64,13 +131,7 @@ const detectIntent = (message) => {
     /గ్రూప్‌లో ఎంతమంది సభ్యులు/
   ])) return "group_members_count";
 
-  if (hasAny(text, [
-    /group total loan/,
-    /how much loan.*our group/,
-    /group loan amount/,
-    /group loan entha/
-  ])) return "group_loan_total";
-
+  // Group Overdue Members
   if (hasAny(text, [
     /group overdue/,
     /which members.*overdue/,
@@ -78,6 +139,33 @@ const detectIntent = (message) => {
     /group lo overdue members/
   ])) return "group_overdue_members";
 
+  // Group Loan Total
+  if (hasAny(text, [
+    /group total loan/,
+    /how much loan.*our group/,
+    /our group loan/,
+    /mana group loan/,
+    /group loan amount/,
+    /group loan entha/
+  ])) return "group_loan_total";
+
+  // Group Loan Paid & Outstanding
+  if (hasAny(text, [
+    /group.*paid/,
+    /how much.*group.*paid/,
+    /group total paid/
+  ])) return "group_paid_total";
+
+  if (hasAny(text, [
+    /group.*outstanding/,
+    /group.*remaining/,
+    /group.*balance/,
+    /our.*outstanding/,
+    /our.*remaining/,
+    /our.*balance/
+  ])) return "group_outstanding_total";
+
+  // Group Summary
   if (hasAny(text, [
     /group summary/,
     /group details/,
@@ -85,26 +173,19 @@ const detectIntent = (message) => {
     /our group/
   ])) return "group_summary";
 
-  // 2. General Questions & Capabilities
-  if (hasAny(text, [
-    /what can you (do|help)/,
-    /help me with/,
-    /explain.*emi/,
-    /what is.*emi/,
-    /explain.*subsidy/,
-    /what is.*subsidy/
-  ])) return "general_question";
+  // --- 3. PERSONAL INTENTS ---
 
-  // 3. Paid Amount
+  // Personal Paid Amount
   if (hasAny(text, [
     /how much.*paid/,
     /total paid/,
     /nenu entha pay/,
+    /entha pay chesanu/,
     /paid amount/,
     /payment completed/
-  ])) return "paid_amount";
+  ])) return "personal_loan_paid";
 
-  // 4. Loan Balance / Remaining
+  // Personal Loan Balance / Remaining
   if (hasAny(text, [
     /loan (left|remaining|balance)/,
     /how much.*loan.*(left|remaining|balance|pay)/,
@@ -117,22 +198,25 @@ const detectIntent = (message) => {
     /naa loan inka entha und/,
     /naaku entha loan und/,
     /రుణం.*మిగిలి/
-  ])) return "loan_balance";
+  ])) return "personal_loan_remaining";
 
-  // 5. Loan Total (strict total loan queries)
+  // Personal Loan Total
   if (hasAny(text, [
     /\btotal loan\b/,
     /\bloan amount\b/,
+    /what is my loan/,
+    /my loan/,
     /what is my total loan/,
     /how much loan do i have/,
     /my total loan/,
     /my loan amount/,
     /how much did i borrow/,
     /మొత్తం రుణం/,
-    /naa total loan/
-  ])) return "loan_total";
+    /naa total loan/,
+    /naa loan/
+  ])) return "personal_loan_total";
 
-  // 6. Active Loans
+  // Personal Active Loans
   if (hasAny(text, [
     /active loan/,
     /my active loans/,
@@ -140,17 +224,19 @@ const detectIntent = (message) => {
     /which.*loans.*active/,
     /list.*active loans/,
     /ప్రస్తుత రుణాలు/
-  ]) && !text.includes("total") && !text.includes("balance") && !text.includes("remaining")) return "active_loans";
+  ]) && !text.includes("total") && !text.includes("balance") && !text.includes("remaining")) return "personal_active_loans";
 
-  // 7. Overdue EMI
+  // Personal Overdue EMI
   if (hasAny(text, [
     /overdue/,
     /is my emi overdue/,
     /pending emi overdue/,
+    /tappu emi/,
+    /naa emi overdue/,
     /ఓవర్‌డ్యూ/
-  ])) return "overdue_emi";
+  ])) return "personal_overdue_emi";
 
-  // 8. Next EMI / EMI Due Date
+  // Personal Next EMI / Due Date
   if (hasAny(text, [
     /next emi/,
     /when is the next one/,
@@ -160,79 +246,71 @@ const detectIntent = (message) => {
     /తదుపరి ఈఎంఐ/,
     /గడువు తేదీ/,
     /emi eppudu/,
+    /naa emi eppudu/,
     /next installment/
-  ])) return "next_emi";
+  ])) return "personal_next_emi";
 
-  // 9. EMI Amount
+  // Personal EMI Amount
   if (hasAny(text, [
     /how much.*emi/,
     /emi amount/,
     /ఈఎంఐ మొత్తం/,
     /emi entha/,
     /naa emi entha/
-  ])) return "emi_amount";
+  ])) return "personal_emi_amount";
 
-  // 10. Account Overview
+  // Personal Account Overview
   if (hasAny(text, [
     /tell me about my account/,
     /account summary/,
     /account details/,
     /my account/
-  ])) return "account_overview";
+  ])) return "personal_account_summary";
 
-  // 11. Transactions / Payment History
+  // Personal Transactions / Last Payment
   if (hasAny(text, [
+    /last payment/,
+    /what was my last payment/,
+    /recent payment/,
+    /did i make a payment/,
     /transaction/,
     /payment history/,
     /show.*transaction/,
     /show.*payment/,
-    /recent payment/,
-    /last payment/,
     /లావాదేవీలు/,
-    /naa transactions/
-  ])) return "transactions";
+    /naa transactions/,
+    /naa last payment/
+  ])) return "personal_transaction_history";
 
-  // 12. Subsidies
+  // Personal Subsidies
   if (hasAny(text, [
     /subsid(y|ies)/,
     /సబ్సిడీ/,
     /show.*subsid/,
-    /naa subsidy/
-  ])) return "subsidies";
+    /naa subsidy/,
+    /subsidy vachinda/
+  ])) return "personal_subsidy_total";
 
-  // 13. Notifications
+  // Personal Notifications
   if (hasAny(text, [
     /notification/,
     /alert/,
     /reminder/,
     /నోటిఫికేషన్లు/,
-    /show.*notification/
-  ])) return "notifications";
+    /show.*notification/,
+    /do i have any reminders/
+  ])) return "personal_notifications";
 
-  // 14. Profile
-  if (hasAny(text, [
-    /who am i/,
-    /profile/,
-    /my detail/,
-    /naa profile/,
-    /naa detail/,
-    /ప్రొఫైల్/
-  ])) return "profile";
+  // Profile & Group ID
+  if (hasAny(text, [/who am i/, /profile/, /my detail/, /naa profile/])) return "personal_profile";
+  if (hasAny(text, [/group id/, /group number/, /గ్రూప్ ఐడి/])) return "personal_group_id";
 
-  // 15. Group ID
-  if (hasAny(text, [
-    /group id/,
-    /group number/,
-    /గ్రూప్ ఐడి/
-  ])) return "group_id";
+  // Greetings & Non-Financial
+  if (hasAny(text, [/\bhi\b/, /\bhello\b/, /\bhey\b/, /నమస్తే/])) return "greeting";
+  if (hasAny(text, [/thanks/, /thank you/, /ధన్యవాదాలు/])) return "thanks";
 
-  // 16. Greetings
-  if (hasAny(text, [
-    /\bhi\b/,
-    /\bhello\b/,
-    /\bhey\b/,
-    /నమస్తే/
-  ])) return "greeting";
+  // General Educational Questions
+  if (hasAny(text, [/what can you (do|help)/, /help me/, /explain.*emi/, /what is.*emi/, /explain.*subsidy/, /what is.*subsidy/])) return "general_financial_question";
 
   return "unknown";
 };
@@ -248,52 +326,73 @@ const getAuthenticatedUser = async (authenticatedUser) => {
   return user;
 };
 
-// Data retrieval functions
+/**
+ * Data Retrieval Layer (Always Grounded in MongoDB Atlas)
+ */
 const fetchDataForIntent = async (intent, user) => {
+  const isLeader = user.role === "leader" || ["president", "secretary"].includes(user.position);
+
   switch (intent) {
-    case "group_members_count":
-    case "group_loan_total":
-    case "group_overdue_members":
-    case "group_summary": {
-      if (user.role === "leader" || ["president", "secretary"].includes(user.position)) {
-        return await getGroupSummary(user.groupId);
-      }
-      return { isMemberRestricted: true };
+    // --- GROUP INTENTS ---
+    case "group_subsidy_total":
+    case "group_subsidy_members": {
+      if (!isLeader) return { isMemberRestricted: true };
+      const groupSubsidies = await Subsidy.find({ groupId: user.groupId }).sort({ createdAt: -1 }).lean();
+      const totalAmount = groupSubsidies.reduce((sum, s) => sum + (s.amount || 0), 0);
+      return {
+        groupId: user.groupId,
+        totalAmount,
+        count: groupSubsidies.length,
+        subsidies: groupSubsidies,
+      };
     }
 
-    case "loan_total":
-    case "paid_amount":
-    case "loan_balance":
-    case "active_loans": {
+    case "group_members_count":
+    case "group_loan_total":
+    case "group_paid_total":
+    case "group_outstanding_total":
+    case "group_emi_summary":
+    case "group_overdue_members":
+    case "group_summary": {
+      if (!isLeader) return { isMemberRestricted: true };
+      return await getGroupSummary(user.groupId);
+    }
+
+    // --- PERSONAL INTENTS ---
+    case "personal_loan_total":
+    case "personal_loan_paid":
+    case "personal_loan_remaining":
+    case "personal_active_loans": {
       return await getMyLoanSummary(user.userId, user.groupId, user.role);
     }
 
-    case "next_emi":
-    case "emi_amount":
-    case "emi_due_date":
-    case "emi_details":
-    case "overdue_emi": {
+    case "personal_next_emi":
+    case "personal_emi_amount":
+    case "personal_overdue_emi":
+    case "personal_emi_summary": {
       return await getMyEmiSummary(user.userId, user.groupId, user.role);
     }
 
-    case "account_overview": {
+    case "personal_account_summary": {
       return await getMyAccountSummary(user.userId, user.groupId, user.role);
     }
 
-    case "transactions": {
+    case "personal_transaction_history":
+    case "personal_last_payment": {
       return await getMyTransactionSummary(user.userId, user.groupId, user.role, 10);
     }
 
-    case "subsidies": {
+    case "personal_subsidy_total":
+    case "personal_subsidy_history": {
       return await getMySubsidySummary(user.userId, user.groupId, user.role);
     }
 
-    case "notifications": {
+    case "personal_notifications": {
       return await getMyNotificationSummary(user.userId, user.groupId, user.role, 10);
     }
 
-    case "profile":
-    case "group_id":
+    case "personal_profile":
+    case "personal_group_id":
       return user;
 
     default:
@@ -301,30 +400,50 @@ const fetchDataForIntent = async (intent, user) => {
   }
 };
 
-const getFollowUpSuggestions = (intent, language) => {
+const getFollowUpSuggestions = (intent, language, isLeader = false) => {
   const isTelugu = language === "te" || language === "te-en";
 
-  switch (intent) {
-    case "group_summary":
-    case "group_loan_total":
-    case "group_members_count":
-      return isTelugu
-        ? ["గ్రూప్ లో ఎంతమంది సభ్యులు ఉన్నారు?", "గ్రూప్ లో ఓవర్‌డ్యూ ఉన్నవారెవరు?", "నా వ్యక్తిగత రుణ వివరాలు"]
-        : ["How many members are in my group?", "Which members have overdue EMIs?", "Show my personal account summary"];
+  if (isLeader) {
+    switch (intent) {
+      case "group_subsidy_total":
+      case "group_subsidy_members":
+        return isTelugu
+          ? ["ఎవరెవరికి సబ్సిడీ వచ్చింది?", "గ్రూప్ మొత్తం రుణం ఎంత?", "ఓవర్‌డ్యూ ఉన్న సభ్యులు ఎవరు?"]
+          : ["Which members received subsidy?", "Group total loan", "Which members have overdue EMIs?"];
 
-    case "loan_total":
-    case "loan_balance":
-    case "paid_amount":
+      case "group_summary":
+      case "group_loan_total":
+      case "group_members_count":
+        return isTelugu
+          ? ["గ్రూప్ సబ్సిడీ ఎంత?", "గ్రూప్ లో ఓవర్‌డ్యూ ఉన్నవారెవరు?", "నా వ్యక్తిగత వివరాలు"]
+          : ["Group total subsidy", "Which members have overdue EMIs?", "Show my personal account summary"];
+
+      default:
+        return isTelugu
+          ? ["గ్రూప్ మొత్తం రుణం ఎంత?", "గ్రూప్ సబ్సిడీ ఎంత?", "ఓవర్‌డ్యూ సభ్యులు ఎవరు?"]
+          : ["Group total loan", "Group total subsidy", "Which members have overdue EMIs?"];
+    }
+  }
+
+  switch (intent) {
+    case "personal_loan_total":
+    case "personal_loan_remaining":
+    case "personal_loan_paid":
       return isTelugu
         ? ["తదుపరి ఈఎంఐ ఎప్పుడు?", "నా చెల్లింపుల చరిత్ర చూపించు", "ఓవర్‌డ్యూ ఈఎంఐ ఏమైనా ఉందా?"]
         : ["When is my next EMI?", "How much have I paid?", "Show my recent transactions"];
 
-    case "next_emi":
-    case "emi_amount":
-    case "overdue_emi":
+    case "personal_next_emi":
+    case "personal_emi_amount":
+    case "personal_overdue_emi":
       return isTelugu
-        ? ["నాకు ఇంకా ఎంత రుణం బకాయి ఉంది?", "నా చెల్లింపుల చరిత్ర చూపించు", "నా ప్రొఫైల్ వివరాలు"]
+        ? ["నాకు ఇంకా ఎంత రుణం బకాయి ఉంది?", "నా చెల్లింపుల చరిత్ర చూపించు", "నా సబ్సిడీ వివరాలు"]
         : ["How much loan do I have left?", "Show my transactions", "Do I have any subsidies?"];
+
+    case "personal_subsidy_total":
+      return isTelugu
+        ? ["మొత్తం రుణం ఎంత?", "తదుపరి ఈఎంఐ ఎప్పుడు?", "నా లావాదేవీలు"]
+        : ["What is my total loan?", "When is my next EMI?", "Show my recent transactions"];
 
     default:
       return isTelugu
@@ -333,45 +452,131 @@ const getFollowUpSuggestions = (intent, language) => {
   }
 };
 
+/**
+ * Natural Language Response Generator
+ */
 const constructResponse = (intent, data, language, user, rawMessage = "") => {
   const isTelugu = language === "te" || language === "te-en";
+  const isLeader = user.role === "leader" || ["president", "secretary"].includes(user.position);
 
   if (intent === "greeting") {
     return {
       reply: isTelugu
-        ? "నమస్తే! నేను మీ డిడబ్ల్యూసిఆర్‌ఎ సహాయకుడిని. మీ రుణం, ఈఎంఐ, చెల్లింపులు, సబ్సిడీలు మరియు ప్రొఫైల్ వివరాల గురించి సహాయం చేయగలను."
+        ? "నమస్తే! నేను మీ డిడబ్ల్యూసిఆర్‌ఎ సహాయకుడిని. మీ రుణం, ఈఎంఐ, చెల్లింపులు, సబ్సిడీలు మరియు నోటిఫికేషన్‌ల వివరాల గురించి సహాయం చేయగలను."
         : "Hello! I am your DWCRA Connect AI Assistant. I can help you with your loan, EMI, payments, subsidies, transactions, notifications, and profile.",
-      suggestions: getFollowUpSuggestions("greeting", language)
+      suggestions: getFollowUpSuggestions("greeting", language, isLeader)
     };
   }
 
-  // Group Intents
-  if (["group_members_count", "group_loan_total", "group_overdue_members", "group_summary"].includes(intent)) {
+  if (intent === "thanks") {
+    return {
+      reply: isTelugu
+        ? "మీకు సహాయపడినందుకు సంతోషం! ఇంకా ఏమైనా సందేహాలు ఉంటే అడగండి."
+        : "You're welcome! Let me know if you need any other account details.",
+      suggestions: getFollowUpSuggestions("general", language, isLeader)
+    };
+  }
+
+  if (intent === "general_financial_question") {
+    const text = rawMessage.toLowerCase();
+    if (text.includes("emi")) {
+      return {
+        reply: isTelugu
+          ? "ఈఎంఐ (EMI - Equated Monthly Installment) అనేది ప్రతి నెలా మీరు చెల్లించాల్సిన స్థిరమైన వాయిదా మొత్తం."
+          : "An EMI (Equated Monthly Installment) is a fixed payment amount made by a borrower to a lender at a specified date each calendar month.",
+        suggestions: getFollowUpSuggestions("personal_next_emi", language, isLeader)
+      };
+    }
+    if (text.includes("subsidy")) {
+      return {
+        reply: isTelugu
+          ? "సబ్సిడీ అనేది ప్రభుత్వం అందించే ఆర్థిక సహాయం లేదా గ్రాంట్."
+          : "A subsidy is financial assistance or grant provided by the government to support SHG members.",
+        suggestions: getFollowUpSuggestions("personal_subsidy_total", language, isLeader)
+      };
+    }
+    return {
+      reply: isTelugu
+        ? "నేను మీ రుణం, ఈఎంఐ, సబ్సిడీ మరియు ఖాతా వివరాల గురించి సహాయం చేయగలను."
+        : "I can help you with questions about your loans, EMIs, subsidies, transactions, and account summary.",
+      suggestions: getFollowUpSuggestions("general", language, isLeader)
+    };
+  }
+
+  // --- GROUP INTENTS ---
+  if (intent.startsWith("group_")) {
     if (data && data.isMemberRestricted) {
       return {
         reply: isTelugu
-          ? `గ్రూప్ సభ్యురాలిగా, మీరు మీ వ్యక్తిగత ఖాతా వివరాలను వీక్షించవచ్చు. మీ గ్రూప్ (${user.groupId}) నందు 10 మంది క్రియాశీల సభ్యులు ఉన్నారు.`
+          ? `గ్రూప్ సభ్యురాలిగా, మీరు మీ వ్యక్తిగత ఖాతా వివరాలను వీక్షించవచ్చు. మీ గ్రూప్ (${user.groupId}) నందు 10 మంది క్రియాశీల సభ్యులు ఉన్నారు. వివరమైన గ్రూప్ ఆర్థిక నివేదికలు ప్రెసిడెంట్ లేదా సెక్రటరీకి అందుబాటులో ఉంటాయి.`
           : `As a group member, you can view your personal account summary. Your group (${user.groupId}) has 10 active members. Group-wide financial summaries are available to group leaders (President/Secretary).`,
-        suggestions: getFollowUpSuggestions("loan_total", language)
+        suggestions: getFollowUpSuggestions("personal_loan_total", language, false)
       };
     }
 
     const grp = data || {};
+
+    // Fixed Group Subsidy Total Intent
+    if (intent === "group_subsidy_total") {
+      const totalSub = grp.totalAmount || 0;
+      const count = grp.count || 0;
+      return {
+        reply: isTelugu
+          ? `మీ గ్రూప్ (${user.groupId}) ఇప్పటివరకు మొత్తం ₹${totalSub.toLocaleString('en-IN')} సబ్సిడీ పొందడమైనది (మొత్తం ${count} సబ్సిడీ గ్రాంట్‌లు).`
+          : `Your group (${user.groupId}) has received a total subsidy of ₹${totalSub.toLocaleString('en-IN')} across ${count} member subsidy record(s).`,
+        suggestions: getFollowUpSuggestions("group_subsidy_total", language, true)
+      };
+    }
+
+    // Group Subsidy Member Breakdown
+    if (intent === "group_subsidy_members") {
+      const list = grp.subsidies || [];
+      if (list.length === 0) {
+        return {
+          reply: isTelugu ? "మీ గ్రూప్‌లో ఎవరికీ సబ్సిడీ లభించలేదు." : "No member subsidy records found for your group.",
+          suggestions: getFollowUpSuggestions("group_subsidy_total", language, true)
+        };
+      }
+      const details = list.map(s => `${s.memberId}: ₹${(s.amount || 0).toLocaleString('en-IN')} (${s.schemeName || 'Subsidy'})`).join("\n");
+      return {
+        reply: (isTelugu ? `గ్రూప్ (${user.groupId}) సబ్సిడీ వివరాలు:\n` : `Member Subsidy Breakdown for group ${user.groupId}:\n`) + details,
+        suggestions: getFollowUpSuggestions("group_subsidy_total", language, true)
+      };
+    }
+
     if (intent === "group_members_count") {
       return {
         reply: isTelugu
           ? `మీ గ్రూప్ (${user.groupId}) నందు మొత్తం ${grp.totalMembers || 10} మంది క్రియాశీల సభ్యులు ఉన్నారు. (ప్రెసిడెంట్: ${grp.president ? grp.president.name : 'N/A'}, సెక్రటరీ: ${grp.secretary ? grp.secretary.name : 'N/A'}).`
           : `Your group (${user.groupId}) has ${grp.totalMembers || 10} active members. (President: ${grp.president ? grp.president.name : 'N/A'}, Secretary: ${grp.secretary ? grp.secretary.name : 'N/A'}).`,
-        suggestions: getFollowUpSuggestions("group_summary", language)
+        suggestions: getFollowUpSuggestions("group_summary", language, true)
       };
     }
 
     if (intent === "group_loan_total") {
       return {
         reply: isTelugu
-          ? `మీ గ్రూప్ (${user.groupId}) మొత్తం రుణ ప్రిన్సిపల్ ₹${(grp.totalGroupPrincipal || 0).toLocaleString('en-IN')}, చెల్లించినది ₹${(grp.totalGroupPaid || 0).toLocaleString('en-IN')}, మిగిలిన బకాయి ₹${(grp.totalGroupRemaining || 0).toLocaleString('en-IN')}.`
+          ? `మీ గ్రూప్ (${user.groupId}) మొత్తం రుణ ప్రిన్సిపల్ ₹${(grp.totalGroupPrincipal || 0).toLocaleString('en-IN')}. చెల్లించినది ₹${(grp.totalGroupPaid || 0).toLocaleString('en-IN')}, మిగిలిన బకాయి ₹${(grp.totalGroupRemaining || 0).toLocaleString('en-IN')}.`
           : `Your group (${user.groupId}) total loan principal is ₹${(grp.totalGroupPrincipal || 0).toLocaleString('en-IN')}. Total paid: ₹${(grp.totalGroupPaid || 0).toLocaleString('en-IN')}, Remaining balance: ₹${(grp.totalGroupRemaining || 0).toLocaleString('en-IN')}.`,
-        suggestions: getFollowUpSuggestions("group_summary", language)
+        suggestions: getFollowUpSuggestions("group_summary", language, true)
+      };
+    }
+
+    if (intent === "group_paid_total") {
+      return {
+        reply: isTelugu
+          ? `మీ గ్రూప్ (${user.groupId}) చెల్లించిన మొత్తం రుణ చెల్లింపులు ₹${(grp.totalGroupPaid || 0).toLocaleString('en-IN')}.`
+          : `Your group (${user.groupId}) has paid a total of ₹${(grp.totalGroupPaid || 0).toLocaleString('en-IN')} towards loans.`,
+        suggestions: getFollowUpSuggestions("group_summary", language, true)
+      };
+    }
+
+    if (intent === "group_outstanding_total") {
+      return {
+        reply: isTelugu
+          ? `మీ గ్రూప్ (${user.groupId}) మిగిలిన రుణ బకాయి ₹${(grp.totalGroupRemaining || 0).toLocaleString('en-IN')}.`
+          : `Your group (${user.groupId}) total outstanding loan balance is ₹${(grp.totalGroupRemaining || 0).toLocaleString('en-IN')}.`,
+        suggestions: getFollowUpSuggestions("group_summary", language, true)
       };
     }
 
@@ -382,7 +587,7 @@ const constructResponse = (intent, data, language, user, rawMessage = "") => {
           reply: isTelugu
             ? `మీ గ్రూప్‌లో ఎవరికీ ఓవర్‌డ్యూ ఈఎంఐ బకాయిలు లేవు.`
             : `None of the members in your group (${user.groupId}) have overdue EMIs.`,
-          suggestions: getFollowUpSuggestions("group_summary", language)
+          suggestions: getFollowUpSuggestions("group_summary", language, true)
         };
       }
       const names = overdueMembers.map(m => `${m.name} (${m.userId})`).join(", ");
@@ -390,116 +595,144 @@ const constructResponse = (intent, data, language, user, rawMessage = "") => {
         reply: isTelugu
           ? `మీ గ్రూప్‌లో క్రింది సభ్యులకు ఓవర్‌డ్యూ ఈఎంఐలు ఉన్నాయి: ${names}.`
           : `The following member(s) in your group (${user.groupId}) have overdue EMIs: ${names}.`,
-        suggestions: getFollowUpSuggestions("group_summary", language)
+        suggestions: getFollowUpSuggestions("group_summary", language, true)
       };
     }
 
     return {
       reply: isTelugu
-        ? `గ్రూప్ వివరాలు (${user.groupId}):\n- మొత్తం సభ్యులు: ${grp.totalMembers || 10}\n- మొత్తం రుణం: ₹${(grp.totalGroupPrincipal || 0).toLocaleString('en-IN')}\n- చెల్లించినది: ₹${(grp.totalGroupPaid || 0).toLocaleString('en-IN')}\n- మిగిలిన బకాయి: ₹${(grp.totalGroupRemaining || 0).toLocaleString('en-IN')}\n- ఓవర్‌డ్యూ ఈఎంఐలు: ${grp.overdueGroupEmisCount || 0}`
-        : `Group Overview for ${user.groupId}:\n• Total Members: ${grp.totalMembers || 10}\n• Total Loan Principal: ₹${(grp.totalGroupPrincipal || 0).toLocaleString('en-IN')}\n• Total Paid: ₹${(grp.totalGroupPaid || 0).toLocaleString('en-IN')}\n• Remaining Balance: ₹${(grp.totalGroupRemaining || 0).toLocaleString('en-IN')}\n• Overdue EMIs: ${grp.overdueGroupEmisCount || 0}`,
-      suggestions: getFollowUpSuggestions("group_summary", language)
+        ? `గ్రూప్ నివేదిక (${user.groupId}):\n• మొత్తం సభ్యులు: ${grp.totalMembers || 10}\n• మొత్తం రుణం: ₹${(grp.totalGroupPrincipal || 0).toLocaleString('en-IN')}\n• చెల్లించినది: ₹${(grp.totalGroupPaid || 0).toLocaleString('en-IN')}\n• మిగిలిన బకాయి: ₹${(grp.totalGroupRemaining || 0).toLocaleString('en-IN')}\n• ఓవర్‌డ్యూ ఈఎంఐలు: ${grp.overdueGroupEmisCount || 0}\n• మొత్తం సబ్సిడీ: ₹${(grp.totalGroupSubsidyAmount || 0).toLocaleString('en-IN')}`
+        : `Group Summary for ${user.groupId}:\n• Total Members: ${grp.totalMembers || 10}\n• Total Loan Principal: ₹${(grp.totalGroupPrincipal || 0).toLocaleString('en-IN')}\n• Total Paid: ₹${(grp.totalGroupPaid || 0).toLocaleString('en-IN')}\n• Remaining Balance: ₹${(grp.totalGroupRemaining || 0).toLocaleString('en-IN')}\n• Overdue EMIs: ${grp.overdueGroupEmisCount || 0}\n• Total Subsidy Received: ₹${(grp.totalGroupSubsidyAmount || 0).toLocaleString('en-IN')}`,
+      suggestions: getFollowUpSuggestions("group_summary", language, true)
     };
   }
 
-  if (intent === "general_question") {
-    const text = rawMessage.toLowerCase();
-    if (text.includes("emi")) {
-      return {
-        reply: isTelugu
-          ? "ఈఎంఐ (EMI - Equated Monthly Installment) అనేది ప్రతి నెలా మీరు చెల్లించాల్సిన స్థిరమైన వాయిదా మొత్తం."
-          : "An EMI (Equated Monthly Installment) is a fixed payment amount made by a borrower to a lender at a specified date each calendar month.",
-        suggestions: getFollowUpSuggestions("next_emi", language)
-      };
-    }
-    if (text.includes("subsidy")) {
-      return {
-        reply: isTelugu
-          ? "సబ్సిడీ అనేది ప్రభుత్వం అందించే ఆర్థిక సహాయం లేదా గ్రాంట్."
-          : "A subsidy is financial assistance or grant provided by the government to support SHG members.",
-        suggestions: getFollowUpSuggestions("subsidies", language)
-      };
-    }
-    return {
-      reply: isTelugu
-        ? "నేను మీ రుణం, ఈఎంఐ, సబ్సిడీ మరియు ఖాతా వివరాల గురించి సహాయం చేయగలను."
-        : "I can help you with questions about your loans, EMIs, subsidies, transactions, and account summary.",
-      suggestions: getFollowUpSuggestions("general", language)
-    };
-  }
+  // --- PERSONAL INTENTS ---
 
-  // Account Overview
-  if (intent === "account_overview") {
+  if (intent === "personal_account_summary") {
     const acc = data || {};
     const loanSum = acc.loanSummary || {};
     return {
       reply: isTelugu
-        ? `ఖాతా సారాంశం (${user.name}):\n- మొత్తం రుణం: ₹${(loanSum.totalPrincipal || 0).toLocaleString('en-IN')}\n- చెల్లించినది: ₹${(loanSum.totalPaid || 0).toLocaleString('en-IN')}\n- మిగిలిన బకాయి: ₹${(loanSum.remainingBalance || 0).toLocaleString('en-IN')}`
-        : `Account Summary for ${user.name} (${user.userId}):\n• Total Loan: ₹${(loanSum.totalPrincipal || 0).toLocaleString('en-IN')}\n• Total Paid: ₹${(loanSum.totalPaid || 0).toLocaleString('en-IN')}\n• Remaining Balance: ₹${(loanSum.remainingBalance || 0).toLocaleString('en-IN')}\n• Active Loans: ${loanSum.activeLoanCount || 0}`,
-      suggestions: getFollowUpSuggestions("loan_balance", language)
+        ? `ఖాతా సారాంశం (${user.name}):\n• మొత్తం రుణం: ₹${(loanSum.totalPrincipal || 0).toLocaleString('en-IN')}\n• చెల్లించినది: ₹${(loanSum.totalPaid || 0).toLocaleString('en-IN')}\n• మిగిలిన బకాయి: ₹${(loanSum.remainingBalance || 0).toLocaleString('en-IN')}`
+        : `Account Summary for ${user.name} (${user.userId}):\n• Total Loan Principal: ₹${(loanSum.totalPrincipal || 0).toLocaleString('en-IN')}\n• Total Paid: ₹${(loanSum.totalPaid || 0).toLocaleString('en-IN')}\n• Remaining Balance: ₹${(loanSum.remainingBalance || 0).toLocaleString('en-IN')}\n• Active Loans: ${loanSum.activeLoanCount || 0}`,
+      suggestions: getFollowUpSuggestions("personal_loan_remaining", language, false)
     };
   }
 
-  // EMI Intents
-  if (["next_emi", "emi_amount", "emi_due_date", "emi_details", "overdue_emi"].includes(intent)) {
+  if (intent === "personal_loan_total") {
+    const loanSummary = data || {};
+    if (!loanSummary.hasLoans) {
+      return {
+        reply: isTelugu ? "మీ ఖాతా కోసం ఎటువంటి రుణ రికార్డులు కనుగొనబడలేదు." : "No loan records found for your account.",
+        suggestions: getFollowUpSuggestions("personal_loan_total", language, false)
+      };
+    }
+    return {
+      reply: isTelugu
+        ? `మీ మొత్తం రుణ ప్రిన్సిపల్ ₹${loanSummary.totalPrincipal.toLocaleString('en-IN')}.`
+        : `Your total loan principal is ₹${loanSummary.totalPrincipal.toLocaleString('en-IN')}.`,
+      suggestions: getFollowUpSuggestions("personal_loan_total", language, false)
+    };
+  }
+
+  if (intent === "personal_loan_paid") {
+    const loanSummary = data || {};
+    return {
+      reply: isTelugu
+        ? `మీరు ఇప్పటివరకు చెల్లించిన మొత్తం రుణ చెల్లింపులు ₹${loanSummary.totalPaid.toLocaleString('en-IN')}.`
+        : `You have paid a total of ₹${loanSummary.totalPaid.toLocaleString('en-IN')} towards your loan.`,
+      suggestions: getFollowUpSuggestions("personal_loan_paid", language, false)
+    };
+  }
+
+  if (intent === "personal_loan_remaining") {
+    const loanSummary = data || {};
+    if (!loanSummary.hasLoans || loanSummary.activeLoanCount === 0) {
+      return {
+        reply: isTelugu ? "మీకు ఎటువంటి మిగిలిన రుణ బకాయి లేదు." : "You do not have any remaining loan balance.",
+        suggestions: getFollowUpSuggestions("personal_loan_remaining", language, false)
+      };
+    }
+    const explanation = isTelugu
+      ? ` (మొత్తం ప్రిన్సిపల్: ₹${loanSummary.totalPrincipal.toLocaleString('en-IN')}, చెల్లించినది: ₹${loanSummary.totalPaid.toLocaleString('en-IN')}).`
+      : ` (Original Loan: ₹${loanSummary.totalPrincipal.toLocaleString('en-IN')}, Total Paid: ₹${loanSummary.totalPaid.toLocaleString('en-IN')}).`;
+
+    return {
+      reply: isTelugu
+        ? `మీ మిగిలిన రుణ బకాయి ₹${loanSummary.remainingBalance.toLocaleString('en-IN')}.${explanation}`
+        : `Your remaining loan balance is ₹${loanSummary.remainingBalance.toLocaleString('en-IN')}.${explanation}`,
+      suggestions: getFollowUpSuggestions("personal_loan_remaining", language, false)
+    };
+  }
+
+  if (intent === "personal_active_loans") {
+    const loanSummary = data || {};
+    if (!loanSummary.hasLoans || loanSummary.activeLoanCount === 0) {
+      return {
+        reply: isTelugu ? "మీకు ఎటువంటి క్రియాశీల రుణాలు లేవు." : "You don't have any active loans.",
+        suggestions: getFollowUpSuggestions("personal_loan_total", language, false)
+      };
+    }
+    const loanDetails = loanSummary.activeLoans
+      .map(l => `${l.loanType || 'Loan'} (${l.loanId}): ₹${(l.principalAmount || 0).toLocaleString('en-IN')} [${l.status}]`)
+      .join("\n");
+
+    return {
+      reply: (isTelugu ? `మీకు ${loanSummary.activeLoanCount} క్రియాశీల రుణాలు ఉన్నాయి:\n` : `You have ${loanSummary.activeLoanCount} active loan(s):\n`) + loanDetails,
+      suggestions: getFollowUpSuggestions("personal_loan_total", language, false)
+    };
+  }
+
+  // Personal EMI Intents
+  if (["personal_next_emi", "personal_emi_amount", "personal_overdue_emi", "personal_emi_summary"].includes(intent)) {
     const emiSummary = data || {};
     if (!emiSummary.hasEmis || emiSummary.unpaidEmisCount === 0) {
       return {
-        reply: isTelugu ? "మీకు లేదా మీ గ్రూప్ కి ప్రస్తుతం పెండింగ్ ఈఎంఐలు లేవు." : "You don't have any pending EMIs at the moment.",
-        suggestions: getFollowUpSuggestions("next_emi", language)
+        reply: isTelugu ? "మీకు ప్రస్తుతం పెండింగ్ ఈఎంఐలు లేవు." : "You don't have any pending EMIs at the moment.",
+        suggestions: getFollowUpSuggestions("personal_next_emi", language, false)
       };
     }
 
     const nextUpcoming = emiSummary.nextUpcomingEmi;
     const primaryOverdue = emiSummary.primaryOverdueEmi;
 
-    if (intent === "overdue_emi") {
+    if (intent === "personal_overdue_emi") {
       if (emiSummary.overdueEmisCount > 0 && primaryOverdue) {
         return {
           reply: isTelugu
             ? `అవును, మీకు ₹${primaryOverdue.amount.toLocaleString('en-IN')} ఓవర్‌డ్యూ ఈఎంఐ బకాయి ఉంది, గడువు తేదీ ${formatDate(primaryOverdue.dueDate)}.`
             : `Yes, you have an overdue EMI of ₹${primaryOverdue.amount.toLocaleString('en-IN')}, which was due on ${formatDate(primaryOverdue.dueDate)}.`,
-          suggestions: getFollowUpSuggestions("next_emi", language)
+          suggestions: getFollowUpSuggestions("personal_next_emi", language, false)
         };
       } else {
         return {
-          reply: isTelugu
-            ? "మీకు ఎటువంటి ఓవర్‌డ్యూ ఈఎంఐ బకాయిలు లేవు."
-            : "No, you do not have any overdue EMIs at the moment.",
-          suggestions: getFollowUpSuggestions("next_emi", language)
+          reply: isTelugu ? "మీకు ఎటువంటి ఓవర్‌డ్యూ ఈఎంఐ బకాయిలు లేవు." : "No, you do not have any overdue EMIs at the moment.",
+          suggestions: getFollowUpSuggestions("personal_next_emi", language, false)
         };
       }
     }
 
-    if (intent === "emi_amount") {
+    if (intent === "personal_emi_amount") {
       const primary = nextUpcoming || primaryOverdue;
       const amt = primary ? primary.amount : 0;
       return {
-        reply: isTelugu
-          ? `మీ ఈఎంఐ మొత్తం ₹${amt.toLocaleString('en-IN')}.`
-          : `Your EMI amount is ₹${amt.toLocaleString('en-IN')}.`,
-        suggestions: getFollowUpSuggestions("next_emi", language)
+        reply: isTelugu ? `మీ ఈఎంఐ మొత్తం ₹${amt.toLocaleString('en-IN')}.` : `Your EMI installment amount is ₹${amt.toLocaleString('en-IN')}.`,
+        suggestions: getFollowUpSuggestions("personal_next_emi", language, false)
       };
     }
 
     if (nextUpcoming) {
       const amt = nextUpcoming.amount || 0;
       const due = formatDate(nextUpcoming.dueDate);
-      const prefix = emiSummary.isGroupSummary
-        ? (isTelugu ? `మీ గ్రూప్ (${user.groupId}) తదుపరి ఈఎంఐ` : `Your group (${user.groupId}) next EMI is`)
-        : (isTelugu ? "మీ తదుపరి ఈఎంఐ" : "Your next EMI is");
-
-      let reply = `${prefix} ₹${amt.toLocaleString('en-IN')}, due on ${due}.`;
+      let reply = isTelugu ? `మీ తదుపరి ఈఎంఐ ₹${amt.toLocaleString('en-IN')}, గడువు తేదీ ${due}.` : `Your next EMI is ₹${amt.toLocaleString('en-IN')}, due on ${due}.`;
 
       if (emiSummary.overdueEmisCount > 0 && primaryOverdue) {
         reply += isTelugu
           ? ` (గమనిక: మీకు ${formatDate(primaryOverdue.dueDate)}న బకాయి ఉన్న ₹${primaryOverdue.amount.toLocaleString('en-IN')} ఈఎంఐ కూడా ఉంది).`
           : ` (Note: You also have an overdue EMI of ₹${primaryOverdue.amount.toLocaleString('en-IN')} due on ${formatDate(primaryOverdue.dueDate)}).`;
       }
-      return {
-        reply,
-        suggestions: getFollowUpSuggestions("next_emi", language)
-      };
+      return { reply, suggestions: getFollowUpSuggestions("personal_next_emi", language, false) };
     } else if (primaryOverdue) {
       const amt = primaryOverdue.amount || 0;
       const due = formatDate(primaryOverdue.dueDate);
@@ -507,171 +740,97 @@ const constructResponse = (intent, data, language, user, rawMessage = "") => {
         reply: isTelugu
           ? `మీకు ₹${amt.toLocaleString('en-IN')} బకాయి (ఓవర్‌డ్యూ) ఈఎంఐ ఉంది, గడువు తేదీ ${due}.`
           : `You have an overdue EMI of ₹${amt.toLocaleString('en-IN')}, which was due on ${due}.`,
-        suggestions: getFollowUpSuggestions("next_emi", language)
+        suggestions: getFollowUpSuggestions("personal_next_emi", language, false)
       };
     }
   }
 
-  // Loan Intents
-  if (intent === "loan_total") {
-    const loanSummary = data || {};
-    if (!loanSummary.hasLoans) {
-      return {
-        reply: isTelugu
-          ? "మీ ఖాతా లేదా మీ గ్రూప్ కోసం ఎటువంటి రుణ రికార్డులు కనుగొనబడలేదు."
-          : "I couldn't find any loan records for your account or group.",
-        suggestions: getFollowUpSuggestions("loan_total", language)
-      };
-    }
-
-    const prefix = loanSummary.isGroupSummary
-      ? (isTelugu ? `మీ గ్రూప్ (${user.groupId}) మొత్తం రుణ మొత్తం` : `Your group (${user.groupId}) total loan amount is`)
-      : (isTelugu ? "మీ మొత్తం రుణ మొత్తం" : "Your total loan amount is");
-
-    return {
-      reply: `${prefix} ₹${loanSummary.totalPrincipal.toLocaleString('en-IN')}.`,
-      suggestions: getFollowUpSuggestions("loan_total", language)
-    };
-  }
-
-  if (intent === "paid_amount") {
-    const loanSummary = data || {};
-    const prefix = loanSummary.isGroupSummary
-      ? (isTelugu ? `మీ గ్రూప్ (${user.groupId}) చెల్లించిన మొత్తం` : `Your group (${user.groupId}) has paid a total of`)
-      : (isTelugu ? "మీరు చెల్లించిన మొత్తం" : "You have paid a total of");
-
-    return {
-      reply: `${prefix} ₹${loanSummary.totalPaid.toLocaleString('en-IN')} towards loan payments.`,
-      suggestions: getFollowUpSuggestions("paid_amount", language)
-    };
-  }
-
-  if (intent === "loan_balance") {
-    const loanSummary = data || {};
-    if (!loanSummary.hasLoans || loanSummary.activeLoanCount === 0) {
-      return {
-        reply: isTelugu
-          ? "మీకు లేదా మీ గ్రూప్ కి ఎటువంటి మిగిలిన రుణ బకాయి లేదు."
-          : "You do not have any remaining loan balance.",
-        suggestions: getFollowUpSuggestions("loan_balance", language)
-      };
-    }
-
-    const prefix = loanSummary.isGroupSummary
-      ? (isTelugu ? `మీ గ్రూప్ (${user.groupId}) మిగిలిన రుణ బకాయి` : `Your group (${user.groupId}) remaining loan balance is`)
-      : (isTelugu ? "మీ మిగిలిన రుణ బకాయి" : "Your remaining loan balance is");
-
-    const original = loanSummary.isGroupSummary ? loanSummary.totalPrincipal : loanSummary.activePrincipal;
-    const explanation = isTelugu
-      ? ` (మొత్తం ప్రిన్సిపల్: ₹${original.toLocaleString('en-IN')}, చెల్లించినది: ₹${loanSummary.totalPaid.toLocaleString('en-IN')}).`
-      : ` (Original Loan: ₹${original.toLocaleString('en-IN')}, Total Paid: ₹${loanSummary.totalPaid.toLocaleString('en-IN')}).`;
-
-    return {
-      reply: `${prefix} ₹${loanSummary.remainingBalance.toLocaleString('en-IN')}.${explanation}`,
-      suggestions: getFollowUpSuggestions("loan_balance", language)
-    };
-  }
-
-  if (intent === "active_loans") {
-    const loanSummary = data || {};
-    if (!loanSummary.hasLoans || loanSummary.activeLoanCount === 0) {
-      return {
-        reply: isTelugu ? "మీకు ఎటువంటి క్రియాశీల రుణాలు లేవు." : "You don't have any active loans.",
-        suggestions: getFollowUpSuggestions("active_loans", language)
-      };
-    }
-    const loanCount = loanSummary.activeLoanCount;
-    const loanDetails = loanSummary.activeLoans
-      .map(l => `${l.loanType || 'Loan'} (${l.memberId}): ₹${(l.principalAmount || 0).toLocaleString('en-IN')} [${l.status}]`)
-      .join("\n");
-
-    const header = loanSummary.isGroupSummary
-      ? (isTelugu ? `మీ గ్రూప్ (${user.groupId}) నందు ${loanCount} క్రియాశీల రుణాలు ఉన్నాయి:\n` : `Your group (${user.groupId}) has ${loanCount} active loan(s):\n`)
-      : (isTelugu ? `మీకు ${loanCount} క్రియాశీల రుణాలు ఉన్నాయి:\n` : `You have ${loanCount} active loan(s):\n`);
-
-    return {
-      reply: header + loanDetails,
-      suggestions: getFollowUpSuggestions("active_loans", language)
-    };
-  }
-
-  // Transactions
-  if (intent === "transactions") {
+  // Personal Transactions
+  if (intent === "personal_transaction_history" || intent === "personal_last_payment") {
     const txSummary = data || {};
     if (!txSummary.hasTransactions) {
       return {
-        reply: isTelugu ? "ఇటీవలి లావాదేవీలు ఏవీ లేవు." : "No recent transactions found.",
-        suggestions: getFollowUpSuggestions("transactions", language)
+        reply: isTelugu ? "ఇటీవలి చెల్లింపు లావాదేవీలు ఏవీ లేవు." : "No recent payment transactions found.",
+        suggestions: getFollowUpSuggestions("personal_loan_paid", language, false)
       };
     }
+
+    if (intent === "personal_last_payment" && txSummary.transactions.length > 0) {
+      const lastTx = txSummary.transactions[0];
+      return {
+        reply: isTelugu
+          ? `మీ చివరి చెల్లింపు ₹${lastTx.amount.toLocaleString('en-IN')} తేది ${formatDate(lastTx.paymentDate || lastTx.createdAt)}న విజయవంతంగా పూర్తయింది. (Transaction ID: ${lastTx.transactionId}).`
+          : `Your last payment was ₹${lastTx.amount.toLocaleString('en-IN')} made on ${formatDate(lastTx.paymentDate || lastTx.createdAt)}. (Transaction ID: ${lastTx.transactionId}).`,
+        suggestions: getFollowUpSuggestions("personal_loan_paid", language, false)
+      };
+    }
+
     const txList = txSummary.transactions
-      .map(t => `${formatDate(t.paymentDate || t.createdAt)}: ₹${t.amount} (${t.type || 'payment'})`)
+      .map(t => `${formatDate(t.paymentDate || t.createdAt)}: ₹${t.amount} (${t.notes || t.type}) [${t.transactionId}]`)
       .join("\n");
+
     return {
-      reply: (isTelugu ? "ఇటీవలి లావాదేవీలు:\n" : "Recent transactions:\n") + txList,
-      suggestions: getFollowUpSuggestions("transactions", language)
+      reply: (isTelugu ? "ఇటీవలి చెల్లింపులు:\n" : "Recent payment history:\n") + txList,
+      suggestions: getFollowUpSuggestions("personal_loan_paid", language, false)
     };
   }
 
-  // Subsidies
-  if (intent === "subsidies") {
+  // Personal Subsidies
+  if (intent === "personal_subsidy_total" || intent === "personal_subsidy_history") {
     const subSummary = data || {};
     if (!subSummary.hasSubsidies) {
       return {
-        reply: isTelugu
-          ? "మీ ఖాతా లేదా మీ గ్రూప్ కోసం ఎటువంటి సబ్సిడీ రికార్డులు కనుగొనబడలేదు."
-          : "I couldn't find any subsidy records for your account or group.",
-        suggestions: getFollowUpSuggestions("subsidies", language)
+        reply: isTelugu ? "మీ ఖాతా కోసం ఎటువంటి సబ్సిడీ రికార్డులు కనుగొనబడలేదు." : "No subsidy records found for your account.",
+        suggestions: getFollowUpSuggestions("personal_subsidy_total", language, false)
       };
     }
     const subList = subSummary.subsidies
-      .map(s => `${s.schemeName || 'Subsidy'} (${s.memberId}): ₹${s.amount} [${s.status}]`)
+      .map(s => `• ${s.schemeName || 'Subsidy'}: ₹${s.amount.toLocaleString('en-IN')} [${s.status}]`)
       .join("\n");
+
     return {
-      reply: (isTelugu ? "సబ్సిడీ వివరాలు:\n" : "Subsidy details:\n") + subList,
-      suggestions: getFollowUpSuggestions("subsidies", language)
+      reply: (isTelugu ? `మొత్తం సబ్సిడీ: ₹${subSummary.totalAmount.toLocaleString('en-IN')}\nలభించిన సబ్సిడీలు:\n` : `Total Subsidy Received: ₹${subSummary.totalAmount.toLocaleString('en-IN')}\nSubsidy Records:\n`) + subList,
+      suggestions: getFollowUpSuggestions("personal_subsidy_total", language, false)
     };
   }
 
-  // Notifications
-  if (intent === "notifications") {
+  // Personal Notifications
+  if (intent === "personal_notifications") {
     const notifSummary = data || {};
     if (!notifSummary.hasNotifications) {
       return {
         reply: isTelugu ? "నోటిఫికేషన్లు ఏవీ లేవు." : "No notifications found.",
-        suggestions: getFollowUpSuggestions("general", language)
+        suggestions: getFollowUpSuggestions("general", language, isLeader)
       };
     }
-    const notifList = notifSummary.notifications.map(n => `- ${n.title}`).join("\n");
+    const notifList = notifSummary.notifications.map(n => `• ${n.title}: ${n.message}`).join("\n");
     return {
       reply: (isTelugu ? "ఇటీవలి నోటిఫికేషన్లు:\n" : "Recent notifications:\n") + notifList,
-      suggestions: getFollowUpSuggestions("general", language)
+      suggestions: getFollowUpSuggestions("general", language, isLeader)
     };
   }
 
-  if (intent === "profile") {
+  if (intent === "personal_profile") {
     return {
       reply: isTelugu
-        ? `పేరు: ${data.name}\nID: ${data.userId}\nగ్రూప్: ${data.groupId}`
-        : `Name: ${data.name}\nID: ${data.userId}\nGroup: ${data.groupId}`,
-      suggestions: getFollowUpSuggestions("general", language)
+        ? `పేరు: ${user.name}\nID: ${user.userId}\nగ్రూప్: ${user.groupId}\nరోల్: ${user.position}`
+        : `Name: ${user.name}\nID: ${user.userId}\nGroup: ${user.groupId}\nPosition: ${user.position}`,
+      suggestions: getFollowUpSuggestions("general", language, isLeader)
     };
   }
 
-  if (intent === "group_id") {
+  if (intent === "personal_group_id") {
     return {
-      reply: isTelugu
-        ? `మీ గ్రూప్ ఐడి ${data.groupId}.`
-        : `Your Group ID is ${data.groupId}.`,
-      suggestions: getFollowUpSuggestions("general", language)
+      reply: isTelugu ? `మీ గ్రూప్ ఐడి ${user.groupId}.` : `Your Group ID is ${user.groupId}.`,
+      suggestions: getFollowUpSuggestions("general", language, isLeader)
     };
   }
 
   return {
     reply: isTelugu
-      ? "నేను మీకు మీ రుణం, ఈఎంఐ, లావాదేవీలు, సబ్సిడీలు, నోటిఫికేషన్లు మరియు ప్రొఫైల్ వివరాల గురించి సహాయం చేయగలను."
-      : "I can help you with your loan, EMI, transactions, subsidies, notifications and profile.",
-    suggestions: getFollowUpSuggestions("general", language)
+      ? "నేను మీకు మీ రుణం, ఈఎంఐ, చెల్లింపులు, సబ్సిడీలు, నోటిఫికేషన్లు మరియు ప్రొఫైల్ వివరాల గురించి సహాయం చేయగలను."
+      : "I can help you with your loan, EMI, payments, subsidies, transactions, notifications, and profile.",
+    suggestions: getFollowUpSuggestions("general", language, isLeader)
   };
 };
 
@@ -701,7 +860,10 @@ const processChatMessage = async ({ authenticatedUser, message }) => {
   try {
     const user = await getAuthenticatedUser(authenticatedUser);
     const language = detectLanguage(message);
-    const intent = detectIntent(message);
+
+    // Retrieve previous conversation context for multi-turn support
+    const prevContext = getStoredContext(user.userId);
+    const intent = detectIntent(message, prevContext);
 
     if (intent !== "unknown") {
       const dbStart = Date.now();
@@ -720,6 +882,10 @@ const processChatMessage = async ({ authenticatedUser, message }) => {
 
       const constructed = constructResponse(intent, data, language, user, message);
       const totalMs = Date.now() - startTime;
+
+      // Update short-term conversation context for multi-turn follow-ups
+      const scope = intent.startsWith("group_") ? "group" : "personal";
+      updateStoredContext(user.userId, intent, scope);
 
       if (process.env.NODE_ENV !== "production") {
         console.log(`[CHAT DEBUG] message    : "${message}"`);
@@ -745,7 +911,7 @@ const processChatMessage = async ({ authenticatedUser, message }) => {
     if (aiReply) {
       return {
         reply: aiReply,
-        suggestions: getFollowUpSuggestions("general", language),
+        suggestions: getFollowUpSuggestions("general", language, user.role === "leader"),
         language,
         intent: "ai_fallback",
         dataSource: "ai"
