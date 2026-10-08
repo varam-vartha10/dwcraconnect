@@ -3,6 +3,7 @@ import '../models/user_model.dart';
 import '../../domain/entities/user_entity.dart';
 import '../../domain/entities/member_entity.dart';
 import '../../core/network/api_service.dart';
+import '../../core/network/cache_service.dart';
 
 class UserRepository {
   static Future<UserEntity> login(
@@ -36,6 +37,10 @@ class UserRepository {
       
       // Cache in-memory token to speed up subsequent requests
       ApiService.setToken(token);
+    }
+
+    if (userData['userId'] != null) {
+      await CacheService.setActiveUser(userData['userId']);
     }
 
     return _mapToEntity(userData);
@@ -89,6 +94,10 @@ class UserRepository {
   }
 
   static Future<void> logout() async {
+    final activeUser = await CacheService.getActiveUser();
+    if (activeUser != null) {
+      await CacheService.clearUserCache(activeUser);
+    }
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove('auth_token');
     await ApiService.clearCache();
@@ -132,29 +141,28 @@ class UserRepository {
   }
 
   static Future<List<MemberEntity>> getGroupMembersSummary(String groupId) async {
+    final activeUser = await CacheService.getActiveUser() ?? 'guest';
+    final cacheKey = 'group_members_summary_$groupId';
+
     try {
       final response = await ApiService.get('/account/groups/$groupId/members/summary');
       
       if (response['success'] == true && response['members'] != null) {
         final List membersJson = response['members'];
-        return membersJson.map((json) {
-          final data = Map<String, dynamic>.from(json);
-          return MemberEntity(
-            id: data['userId'] ?? '',
-            name: data['name'] ?? '',
-            mobile: data['phoneNumber'] ?? '',
-            aadhaar: data['aadhaar'] ?? 'XXXX-XXXX-XXXX',
-            village: data['village'] ?? '',
-            shgGroup: groupId,
-            loanAmount: (data['totalPrincipal'] as num?)?.toDouble() ?? 0.0,
-            paidAmount: (data['totalPaid'] as num?)?.toDouble() ?? 0.0,
-            remainingAmount: (data['remainingBalance'] as num?)?.toDouble() ?? 0.0,
-            emiAmount: (data['nextEmiAmount'] as num?)?.toDouble() ?? 0.0,
-            subsidyAmount: (data['subsidyAmount'] as num?)?.toDouble() ?? 0.0,
-          );
-        }).toList();
+        await CacheService.save(
+          userId: activeUser,
+          key: cacheKey,
+          data: membersJson,
+          groupId: groupId,
+        );
+        return _mapJsonToGroupMembers(membersJson, groupId);
       }
-    } catch (_) {}
+    } catch (_) {
+      final cached = await CacheService.get(userId: activeUser, key: cacheKey);
+      if (cached != null && cached['data'] is List) {
+        return _mapJsonToGroupMembers(cached['data'] as List, groupId);
+      }
+    }
 
     // Fallback to basic user fetching if summary fails
     final users = await getUsersByGroup(groupId);
@@ -171,6 +179,25 @@ class UserRepository {
       emiAmount: 0,
       subsidyAmount: 0,
     )).toList();
+  }
+
+  static List<MemberEntity> _mapJsonToGroupMembers(List membersJson, String groupId) {
+    return membersJson.map((json) {
+      final data = Map<String, dynamic>.from(json as Map);
+      return MemberEntity(
+        id: data['userId'] ?? '',
+        name: data['name'] ?? '',
+        mobile: data['phoneNumber'] ?? '',
+        aadhaar: data['aadhaar'] ?? 'XXXX-XXXX-XXXX',
+        village: data['village'] ?? '',
+        shgGroup: groupId,
+        loanAmount: (data['totalPrincipal'] as num?)?.toDouble() ?? 0.0,
+        paidAmount: (data['totalPaid'] as num?)?.toDouble() ?? 0.0,
+        remainingAmount: (data['remainingBalance'] as num?)?.toDouble() ?? 0.0,
+        emiAmount: (data['nextEmiAmount'] as num?)?.toDouble() ?? 0.0,
+        subsidyAmount: (data['subsidyAmount'] as num?)?.toDouble() ?? 0.0,
+      );
+    }).toList();
   }
 
   static UserRole _parseRole(String? role) {
