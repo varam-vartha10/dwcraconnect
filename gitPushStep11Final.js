@@ -5,7 +5,7 @@ try {
   execSync('git add .', { stdio: 'inherit' });
 
   console.log('2. Committing changes...');
-  execSync('git commit -m "Implement offline-first user-scoped local caching, data sync, offline payment protection, and offline chatbot responses"', { stdio: 'inherit' });
+  execSync('git commit -m "Final system validation and release readiness verification"', { stdio: 'inherit' });
 
   console.log('3. Pushing to origin main...');
   execSync('git push origin main', { stdio: 'inherit' });
