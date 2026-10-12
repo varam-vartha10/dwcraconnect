@@ -47,167 +47,107 @@ class ApiService {
     return headers;
   }
 
-  // GET request
+  // GET request with automatic transient retry for Render cold-start
   static Future<Map<String, dynamic>> get(String endpoint) async {
-    final stopwatch = Stopwatch()..start();
-    final url = Uri.parse('$baseUrl$endpoint');
-
-    try {
+    return _executeWithRetry(() async {
+      final stopwatch = Stopwatch()..start();
+      final url = Uri.parse('$baseUrl$endpoint');
       final headers = await _getHeaders();
-
-      if (kDebugMode || kReleaseMode) {
-        print('--- API GET REQUEST: $url ---');
-      }
 
       final response = await http.get(
         url,
         headers: headers,
-      ).timeout(const Duration(seconds: 20));
+      ).timeout(const Duration(seconds: 25));
 
       stopwatch.stop();
-
-      if (kDebugMode || kReleaseMode) {
-        print('--- API GET RESPONSE: $url [Status: ${response.statusCode}, Time: ${stopwatch.elapsedMilliseconds}ms] ---');
+      if (kDebugMode) {
+        print('--- API GET [${response.statusCode}] $url (${stopwatch.elapsedMilliseconds}ms) ---');
       }
 
       return _handleResponse(response);
-    } on TimeoutException {
-      stopwatch.stop();
-      if (kDebugMode || kReleaseMode) {
-        print('API GET Timeout ($url) after ${stopwatch.elapsedMilliseconds} ms');
-      }
-      throw Exception('Connection is taking too long. Please try again.');
-    } on SocketException catch (e) {
-      if (kDebugMode || kReleaseMode) {
-        print('API GET SocketException ($url): ${e.message}, osError: ${e.osError}');
-      }
-      if (e.message.contains('Permission denied') || e.osError?.errorCode == 13) {
-        throw Exception('Network permission denied. Please grant internet permission.');
-      }
-      throw Exception('Unable to connect to server. Please check your internet connection.');
-    } on http.ClientException catch (e) {
-      if (kDebugMode || kReleaseMode) {
-        print('API GET ClientException ($url): $e');
-      }
-      throw Exception('Server unavailable. Please try again later.');
-    } catch (e) {
-      if (kDebugMode || kReleaseMode) {
-        print('API GET Error ($url): $e');
-      }
-      rethrow;
-    }
+    });
   }
 
-  // POST request
+  // POST request with automatic transient retry for cold-start
   static Future<Map<String, dynamic>> post(String endpoint, Map<String, dynamic> body) async {
-    final stopwatch = Stopwatch()..start();
-    final url = Uri.parse('$baseUrl$endpoint');
-
-    try {
+    return _executeWithRetry(() async {
+      final stopwatch = Stopwatch()..start();
+      final url = Uri.parse('$baseUrl$endpoint');
       final headers = await _getHeaders();
-      
-      if (kDebugMode || kReleaseMode) {
-        print('--- API POST REQUEST: $url ---');
-      }
 
       final response = await http.post(
         url,
         headers: headers,
         body: jsonEncode(body),
-      ).timeout(const Duration(seconds: 20));
+      ).timeout(const Duration(seconds: 25));
 
       stopwatch.stop();
-
-      if (kDebugMode || kReleaseMode) {
-        print('--- API POST RESPONSE: $url [Status: ${response.statusCode}, Time: ${stopwatch.elapsedMilliseconds}ms] ---');
+      if (kDebugMode) {
+        print('--- API POST [${response.statusCode}] $url (${stopwatch.elapsedMilliseconds}ms) ---');
       }
 
       return _handleResponse(response);
-    } on TimeoutException {
-      stopwatch.stop();
-      if (kDebugMode || kReleaseMode) {
-        print('API POST Timeout ($url) after ${stopwatch.elapsedMilliseconds} ms');
-      }
-      throw Exception('Connection is taking too long. Please try again.');
-    } on SocketException catch (e) {
-      if (kDebugMode || kReleaseMode) {
-        print('API POST SocketException ($url): ${e.message}, osError: ${e.osError}');
-      }
-      if (e.message.contains('Permission denied') || e.osError?.errorCode == 13) {
-        throw Exception('Network permission denied. Please grant internet permission.');
-      }
-      throw Exception('Unable to connect to server. Please check your internet connection.');
-    } on http.ClientException catch (e) {
-      if (kDebugMode || kReleaseMode) {
-        print('API POST ClientException ($url): $e');
-      }
-      throw Exception('Server unavailable. Please try again later.');
-    } catch (e) {
-      if (kDebugMode || kReleaseMode) {
-        print('API POST Error ($url): $e');
-      }
-      rethrow;
-    }
+    });
   }
 
   // PATCH request
   static Future<Map<String, dynamic>> patch(String endpoint, Map<String, dynamic> body) async {
-    final stopwatch = Stopwatch()..start();
-    final url = Uri.parse('$baseUrl$endpoint');
-
-    try {
+    return _executeWithRetry(() async {
+      final stopwatch = Stopwatch()..start();
+      final url = Uri.parse('$baseUrl$endpoint');
       final headers = await _getHeaders();
-
-      if (kDebugMode || kReleaseMode) {
-        print('--- API PATCH REQUEST: $url ---');
-      }
 
       final response = await http.patch(
         url,
         headers: headers,
         body: jsonEncode(body),
-      ).timeout(const Duration(seconds: 20));
+      ).timeout(const Duration(seconds: 25));
 
       stopwatch.stop();
-
-      if (kDebugMode || kReleaseMode) {
-        print('--- API PATCH RESPONSE: $url [Status: ${response.statusCode}, Time: ${stopwatch.elapsedMilliseconds}ms] ---');
+      if (kDebugMode) {
+        print('--- API PATCH [${response.statusCode}] $url (${stopwatch.elapsedMilliseconds}ms) ---');
       }
 
       return _handleResponse(response);
-    } on TimeoutException {
-      stopwatch.stop();
-      if (kDebugMode || kReleaseMode) {
-        print('API PATCH Timeout ($url) after ${stopwatch.elapsedMilliseconds} ms');
+    });
+  }
+
+  // Executes an API operation with 1 automatic retry on transient connection timeouts / socket errors
+  static Future<Map<String, dynamic>> _executeWithRetry(
+    Future<Map<String, dynamic>> Function() action,
+  ) async {
+    int attempts = 0;
+    while (true) {
+      attempts++;
+      try {
+        return await action();
+      } on TimeoutException {
+        if (attempts >= 2) {
+          throw Exception('Server took too long to respond. Please check your internet connection.');
+        }
+        await Future.delayed(const Duration(milliseconds: 1000));
+      } on SocketException catch (e) {
+        if (e.message.contains('Permission denied') || e.osError?.errorCode == 13) {
+          throw Exception('Network permission denied. Please grant internet permission.');
+        }
+        if (attempts >= 2) {
+          throw Exception('Unable to connect to server. Please check your internet connection.');
+        }
+        await Future.delayed(const Duration(milliseconds: 1000));
+      } on http.ClientException {
+        if (attempts >= 2) {
+          throw Exception('Server unavailable. Please try again later.');
+        }
+        await Future.delayed(const Duration(milliseconds: 1000));
+      } catch (e) {
+        // HTTP 401, 400, 403, 500 exceptions rethrow immediately without retrying!
+        rethrow;
       }
-      throw Exception('Connection is taking too long. Please try again.');
-    } on SocketException catch (e) {
-      if (kDebugMode || kReleaseMode) {
-        print('API PATCH SocketException ($url): ${e.message}, osError: ${e.osError}');
-      }
-      if (e.message.contains('Permission denied') || e.osError?.errorCode == 13) {
-        throw Exception('Network permission denied. Please grant internet permission.');
-      }
-      throw Exception('Unable to connect to server. Please check your internet connection.');
-    } on http.ClientException catch (e) {
-      if (kDebugMode || kReleaseMode) {
-        print('API PATCH ClientException ($url): $e');
-      }
-      throw Exception('Server unavailable. Please try again later.');
-    } catch (e) {
-      if (kDebugMode || kReleaseMode) {
-        print('API PATCH Error ($url): $e');
-      }
-      rethrow;
     }
   }
 
   // Handle API response
   static Map<String, dynamic> _handleResponse(http.Response response) {
-    if (kDebugMode || kReleaseMode) {
-      print('API Response: ${response.statusCode} - ${response.request?.url}');
-    }
-
     try {
       final data = jsonDecode(response.body);
 
@@ -216,7 +156,7 @@ class ApiService {
       }
 
       if (response.statusCode == 401) {
-        throw Exception(data['message'] ?? 'Invalid credentials or session expired.');
+        throw Exception(data['message'] ?? 'Invalid phone number or password.');
       }
 
       if (response.statusCode == 403) {

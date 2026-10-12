@@ -4,14 +4,9 @@ const mongoose = require("mongoose");
 const User = require("../models/User");
 
 const login = async (req, res) => {
+  const startTime = Date.now();
   try {
     let { phoneNumber, password } = req.body;
-
-    // 1. Diagnostics (Safe logs for development)
-    if (process.env.NODE_ENV !== "production") {
-      console.log(`[Auth] MongoDB readyState: ${mongoose.connection.readyState}`);
-      console.log(`[Auth] Login attempt for phone: ${phoneNumber}`);
-    }
 
     if (!phoneNumber || !password) {
       return res.status(400).json({
@@ -22,32 +17,23 @@ const login = async (req, res) => {
 
     phoneNumber = String(phoneNumber).trim();
 
-    // 2. Find user (First check indexed phoneNumber, fallback to legacy mobile field)
-    let user = await User.findOne({ phoneNumber: phoneNumber, isActive: true });
+    // 1. Fast indexed lookup with .lean() to skip document hydration
+    let user = await User.findOne({ phoneNumber: phoneNumber, isActive: true }).lean();
     if (!user) {
-      user = await User.findOne({ mobile: phoneNumber, isActive: true });
+      user = await User.findOne({ mobile: phoneNumber, isActive: true }).lean();
     }
 
     if (!user) {
-      if (process.env.NODE_ENV !== "production") {
-        console.log(`[Auth] Login failed: User not found or inactive (${phoneNumber})`);
-      }
       return res.status(401).json({
         success: false,
         message: "Invalid phone number or password",
       });
     }
 
-    // 3. Verify password
-    // Support both hashed and legacy plain-text (only if absolutely necessary for transition)
-    // Here we strictly check bcrypt
+    // 2. Verify password
     const isHashed = user.password.startsWith("$2a$") || user.password.startsWith("$2b$");
 
     if (!isHashed) {
-      // If it's not hashed, it's a legacy plain-text password
-      if (process.env.NODE_ENV !== "production") {
-        console.log(`[Auth] CRITICAL: Plain-text password detected for user ${user.userId}.`);
-      }
       if (password !== user.password) {
         return res.status(401).json({
           success: false,
@@ -57,9 +43,6 @@ const login = async (req, res) => {
     } else {
       const passwordMatches = await bcrypt.compare(password, user.password);
       if (!passwordMatches) {
-        if (process.env.NODE_ENV !== "production") {
-          console.log(`[Auth] Login failed: Password mismatch for ${user.userId}`);
-        }
         return res.status(401).json({
           success: false,
           message: "Invalid phone number or password",
@@ -67,11 +50,7 @@ const login = async (req, res) => {
       }
     }
 
-    // 4. Successful login
-    if (process.env.NODE_ENV !== "production") {
-      console.log(`[Auth] Login successful: ${user.userId}`);
-    }
-
+    // 3. Issue JWT Token
     if (!process.env.JWT_SECRET) {
       console.error("CRITICAL: JWT_SECRET environment variable is not set.");
       return res.status(500).json({
@@ -81,13 +60,18 @@ const login = async (req, res) => {
     }
 
     const token = jwt.sign(
-      { id: user._id, userId: user.userId, role: user.role, groupId: user.groupId },
+      { id: user._id.toString(), userId: user.userId, role: user.role, groupId: user.groupId, position: user.position },
       process.env.JWT_SECRET,
       { expiresIn: "30d" }
     );
 
-    const safeUser = user.toObject();
+    const safeUser = { ...user };
     delete safeUser.password;
+    delete safeUser.__v;
+
+    if (process.env.NODE_ENV !== "production") {
+      console.log(`[Auth] Login successful for ${user.userId} in ${Date.now() - startTime}ms`);
+    }
 
     return res.status(200).json({
       success: true,
@@ -106,7 +90,7 @@ const login = async (req, res) => {
 
 const getMe = async (req, res) => {
   try {
-    const user = await User.findById(req.user.id).select("-password");
+    const user = await User.findById(req.user.id).select("-password").lean();
     if (!user) {
       return res.status(404).json({
         success: false,

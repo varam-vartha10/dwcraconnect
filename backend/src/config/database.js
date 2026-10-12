@@ -2,33 +2,28 @@ const mongoose = require("mongoose");
 
 const connectDatabase = async () => {
   try {
-    console.log("Connecting to MongoDB...");
+    console.log("Connecting to MongoDB Atlas connection pool...");
 
     await mongoose.connect(process.env.MONGO_URI, {
       serverSelectionTimeoutMS: 10000,
-      dbName: 'dwcra_connect', // Explicitly force the database name
+      dbName: "dwcra_connect",
+      maxPoolSize: 10,
+      minPoolSize: 2,
+      socketTimeoutMS: 45000,
     });
 
-    console.log("MongoDB connected successfully");
+    console.log("MongoDB connected successfully with pre-warmed connection pool.");
 
-    // Attempt to drop the obsolete 'mobile_1' index if it exists in the 'users' collection
-    try {
-      const db = mongoose.connection.db;
-      const collections = await db.listCollections({ name: 'users' }).toArray();
-      if (collections.length > 0) {
-        const indexes = await db.collection('users').indexes();
-        const hasMobileIndex = indexes.some(idx => idx.name === 'mobile_1');
+    // Ensure compound indexes exist for instant authentication and financial lookups
+    const User = require("../models/User");
+    const Loan = require("../models/Loan");
+    const Emi = require("../models/Emi");
+    const Transaction = require("../models/Transaction");
 
-        if (hasMobileIndex) {
-          console.log("Dropping obsolete 'mobile_1' index...");
-          await db.collection('users').dropIndex("mobile_1");
-          console.log("Index 'mobile_1' dropped successfully");
-        }
-      }
-    } catch (indexError) {
-      // Ignore errors if the index doesn't exist or collection isn't initialized
-      console.log("Note: Obsolete index cleanup skipped or not needed:", indexError.message);
-    }
+    await User.collection.createIndex({ phoneNumber: 1, isActive: 1 }).catch(() => {});
+    await Loan.collection.createIndex({ memberId: 1, groupId: 1 }).catch(() => {});
+    await Emi.collection.createIndex({ memberId: 1, status: 1 }).catch(() => {});
+    await Transaction.collection.createIndex({ memberId: 1, createdAt: -1 }).catch(() => {});
 
   } catch (error) {
     console.error("MongoDB connection failed:");
