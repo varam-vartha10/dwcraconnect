@@ -102,7 +102,7 @@ class _LeaderHome extends ConsumerWidget {
                     '${summary.totalMembers}', 
                     Icons.group_rounded, 
                     AppColors.shgTeal,
-                    onTap: () => ref.read(leaderBottomNavIndexProvider.notifier).state = 1,
+                    onTap: () => context.push('/manage-members'),
                   ),
                   _buildActionCard(
                     l10n.activeLoans, 

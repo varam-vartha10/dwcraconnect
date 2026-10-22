@@ -5,11 +5,14 @@ import '../../features/auth/splash_screen.dart';
 import '../../features/auth/language_selection_screen.dart';
 import '../../features/auth/login_screen.dart';
 import '../../features/auth/registration_screen.dart';
+import '../../features/auth/member_activation_screen.dart';
 import '../../features/auth/otp_verification_screen.dart';
+import '../../features/auth/create_password_screen.dart';
 import '../../features/auth/forgot_password_screen.dart';
 import '../../features/dashboard/member_dashboard_screen.dart';
 import '../../features/dashboard/leader_dashboard_screen.dart';
 import '../../features/dashboard/member_details_screen.dart';
+import '../../features/dashboard/manage_members_screen.dart';
 import '../../features/dashboard/settings_screen.dart';
 import '../../features/dashboard/training_hub_screen.dart';
 import '../../features/loans/loan_balance_screen.dart';
@@ -35,15 +38,26 @@ final routerProvider = Provider<GoRouter>((ref) {
     redirect: (context, state) {
       final isLoggedIn = authState.user != null;
       final isLeader = authState.user?.role == UserRole.leader;
-      
-      final publicRoutes = ['/', '/language-selection', '/login', '/register', '/otp-verification', '/forgot-password'];
+
+      final publicRoutes = [
+        '/',
+        '/language-selection',
+        '/login',
+        '/register',
+        '/activate-account',
+        '/otp-verification',
+        '/create-password',
+        '/forgot-password'
+      ];
+
       final leaderOnlyRoutes = [
-        '/leader-dashboard', 
-        '/member-details', 
-        '/active-loans', 
-        '/pending-emi', 
-        '/subsidy-records', 
-        '/group-ledger', 
+        '/leader-dashboard',
+        '/manage-members',
+        '/member-details',
+        '/active-loans',
+        '/pending-emi',
+        '/subsidy-records',
+        '/group-ledger',
         '/meeting-attendance'
       ];
 
@@ -66,16 +80,33 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(path: '/language-selection', builder: (context, state) => const LanguageSelectionScreen()),
       GoRoute(path: '/login', builder: (context, state) => const LoginScreen()),
       GoRoute(path: '/register', builder: (context, state) => const RegistrationScreen()),
+      GoRoute(path: '/activate-account', builder: (context, state) => const MemberActivationScreen()),
       GoRoute(
         path: '/otp-verification',
         builder: (context, state) {
+          if (state.extra is Map) {
+            final data = state.extra as Map<String, dynamic>;
+            return OtpVerificationScreen(
+              phoneNumber: data['phoneNumber'] ?? '',
+              activationId: data['activationId'] ?? data['registrationId'] ?? '',
+              isRegistration: data.containsKey('registrationId'),
+            );
+          }
           final phoneNumber = state.extra as String? ?? '';
-          return OtpVerificationScreen(phoneNumber: phoneNumber);
+          return OtpVerificationScreen(phoneNumber: phoneNumber, activationId: '');
+        },
+      ),
+      GoRoute(
+        path: '/create-password',
+        builder: (context, state) {
+          final activationId = state.extra as String? ?? '';
+          return CreatePasswordScreen(activationId: activationId);
         },
       ),
       GoRoute(path: '/forgot-password', builder: (context, state) => const ForgotPasswordScreen()),
       GoRoute(path: '/member-dashboard', builder: (context, state) => const MemberDashboardScreen()),
       GoRoute(path: '/leader-dashboard', builder: (context, state) => const LeaderDashboardScreen()),
+      GoRoute(path: '/manage-members', builder: (context, state) => const ManageMembersScreen()),
       GoRoute(
         path: '/member-details/:id',
         builder: (context, state) {

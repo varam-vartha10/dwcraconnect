@@ -224,12 +224,28 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                           onTap: authState.isLoading
                               ? null
                               : () {
+                                  context.push('/activate-account');
+                                },
+                          child: const Text(
+                            'Activate Account',
+                            style: TextStyle(
+                              color: AppColors.secondaryPink,
+                              fontWeight: FontWeight.bold,
+                              decoration: TextDecoration.underline,
+                            ),
+                          ),
+                        ),
+                        const Text(' | '),
+                        GestureDetector(
+                          onTap: authState.isLoading
+                              ? null
+                              : () {
                                   context.push('/register');
                                 },
                           child: Text(
                             l10n.register,
                             style: const TextStyle(
-                              color: AppColors.secondaryPink,
+                              color: AppColors.primaryPurple,
                               fontWeight: FontWeight.bold,
                               decoration: TextDecoration.underline,
                             ),
