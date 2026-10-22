@@ -166,9 +166,10 @@ class _ManageMembersScreenState extends ConsumerState<ManageMembersScreen> {
     );
   }
 
-  void _showUpdateMobileDialog(String userId, String currentName, String currentPhone) {
-    final phoneCtrl = TextEditingController(text: currentPhone.startsWith('TEMP-') ? '' : currentPhone);
+  void _showVerifyIdentityDialog(String userId, String currentName, String currentPhoneMasked) {
+    final phoneCtrl = TextEditingController();
     final formKey = GlobalKey<FormState>();
+    bool physicalChecked = false;
     bool isSaving = false;
 
     showDialog(
@@ -176,57 +177,102 @@ class _ManageMembersScreenState extends ConsumerState<ManageMembersScreen> {
       builder: (dialogCtx) => StatefulBuilder(
         builder: (context, setDialogState) => AlertDialog(
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-          title: Text('Update Mobile for $currentName'),
+          title: Row(
+            children: [
+              const Icon(Icons.verified_user_outlined, color: AppColors.primaryPurple),
+              const SizedBox(width: 8),
+              Expanded(child: Text('Verify Member Identity: $currentName', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold))),
+            ],
+          ),
           content: Form(
             key: formKey,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text('Member ID: $userId', style: const TextStyle(fontSize: 12, color: AppColors.textSecondary)),
-                const SizedBox(height: 16),
-                TextFormField(
-                  controller: phoneCtrl,
-                  keyboardType: TextInputType.phone,
-                  decoration: const InputDecoration(labelText: 'New 10-Digit Mobile Number *', prefixIcon: Icon(Icons.phone_android_rounded)),
-                  validator: (v) => v == null || v.trim().length != 10 ? 'Enter valid 10-digit phone number' : null,
-                ),
-              ],
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: AppColors.primaryPurple.withValues(alpha: 0.08),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('Member ID: $userId', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                        Text('Current Phone: $currentPhoneMasked', style: const TextStyle(fontSize: 12, color: AppColors.textSecondary)),
+                        Text('Group: $_groupId', style: const TextStyle(fontSize: 12, color: AppColors.textSecondary)),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  TextFormField(
+                    controller: phoneCtrl,
+                    keyboardType: TextInputType.phone,
+                    decoration: const InputDecoration(
+                      labelText: 'Member\'s Verified Mobile Number *',
+                      prefixIcon: Icon(Icons.phone_android_rounded),
+                      hintText: '10-digit mobile number',
+                    ),
+                    validator: (v) => v == null || v.trim().length != 10 ? 'Enter valid 10-digit phone number' : null,
+                  ),
+                  const SizedBox(height: 16),
+                  CheckboxListTile(
+                    contentPadding: EdgeInsets.zero,
+                    title: const Text(
+                      'I confirm that I have verified this member\'s identity against our physical SHG register.',
+                      style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+                    ),
+                    value: physicalChecked,
+                    activeColor: AppColors.primaryPurple,
+                    onChanged: (val) => setDialogState(() => physicalChecked = val ?? false),
+                  ),
+                ],
+              ),
             ),
           ),
           actions: [
             TextButton(onPressed: () => Navigator.pop(dialogCtx), child: const Text('Cancel')),
             ElevatedButton(
-              onPressed: isSaving ? null : () async {
-                if (!formKey.currentState!.validate()) return;
-                setDialogState(() => isSaving = true);
-                try {
-                  final response = await ApiService.patch('/groups/$_groupId/roster/$userId/mobile', {
-                    'newPhoneNumber': phoneCtrl.text.trim(),
-                  });
-                  if (!mounted) return;
-                  Navigator.pop(dialogCtx);
-                  if (response['success'] == true) {
-                    _fetchRoster();
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text(response['message'] ?? 'Mobile number updated successfully!'), backgroundColor: AppColors.successGreen),
-                    );
-                  } else {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text(response['message'] ?? 'Failed to update mobile.'), backgroundColor: Colors.redAccent),
-                    );
-                  }
-                } catch (e) {
-                  if (!mounted) return;
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text(e.toString().replaceAll('Exception: ', '')), backgroundColor: Colors.redAccent),
-                  );
-                } finally {
-                  setDialogState(() => isSaving = false);
-                }
-              },
+              onPressed: (!physicalChecked || isSaving)
+                  ? null
+                  : () async {
+                      if (!formKey.currentState!.validate()) return;
+                      setDialogState(() => isSaving = true);
+                      try {
+                        final response = await ApiService.post('/groups/$_groupId/members/$userId/verify-identity', {
+                          'newPhoneNumber': phoneCtrl.text.trim(),
+                          'physicalRegisterChecked': physicalChecked,
+                        });
+                        if (!mounted) return;
+                        Navigator.pop(dialogCtx);
+                        if (response['success'] == true) {
+                          _fetchRoster();
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text(response['message'] ?? 'Identity verified. OTP sent to member.'),
+                              backgroundColor: AppColors.successGreen,
+                              duration: const Duration(seconds: 5),
+                            ),
+                          );
+                        } else {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(content: Text(response['message'] ?? 'Verification failed.'), backgroundColor: Colors.redAccent),
+                          );
+                        }
+                      } catch (e) {
+                        if (!mounted) return;
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(content: Text(e.toString().replaceAll('Exception: ', '')), backgroundColor: Colors.redAccent),
+                        );
+                      } finally {
+                        setDialogState(() => isSaving = false);
+                      }
+                    },
               child: isSaving
                   ? const SizedBox(height: 18, width: 18, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
-                  : const Text('Update Mobile'),
+                  : const Text('Verify & Send Member OTP'),
             ),
           ],
         ),
@@ -328,7 +374,7 @@ class _ManageMembersScreenState extends ConsumerState<ManageMembersScreen> {
                               itemBuilder: (context, index) {
                                 final m = filteredRoster[index];
                                 final isRegistered = m['isRegistered'] == true;
-                                final phone = (m['phoneNumber'] ?? 'Not Set').toString();
+                                final phoneMasked = (m['phoneNumberMasked'] ?? m['phoneNumber'] ?? 'Not Set').toString();
 
                                 return Card(
                                   margin: const EdgeInsets.only(bottom: 12),
@@ -362,7 +408,7 @@ class _ManageMembersScreenState extends ConsumerState<ManageMembersScreen> {
                                       crossAxisAlignment: CrossAxisAlignment.start,
                                       children: [
                                         const SizedBox(height: 2),
-                                        Text('ID: ${m['userId']} | Mobile: $phone', style: const TextStyle(fontSize: 12, color: AppColors.textSecondary)),
+                                        Text('ID: ${m['userId']} | Mobile: $phoneMasked', style: const TextStyle(fontSize: 12, color: AppColors.textSecondary)),
                                         Text('Village: ${m['village']}', style: const TextStyle(fontSize: 11, color: AppColors.textSecondary)),
                                       ],
                                     ),
@@ -387,18 +433,18 @@ class _ManageMembersScreenState extends ConsumerState<ManageMembersScreen> {
                                         ),
                                         PopupMenuButton<String>(
                                           onSelected: (action) {
-                                            if (action == 'update_mobile') {
-                                              _showUpdateMobileDialog(m['userId'], m['name'], phone);
+                                            if (action == 'verify_identity') {
+                                              _showVerifyIdentityDialog(m['userId'], m['name'], phoneMasked);
                                             }
                                           },
                                           itemBuilder: (context) => [
                                             const PopupMenuItem(
-                                              value: 'update_mobile',
+                                              value: 'verify_identity',
                                               child: Row(
                                                 children: [
-                                                  Icon(Icons.phone_android_rounded, size: 18),
+                                                  Icon(Icons.verified_user_outlined, size: 18, color: AppColors.primaryPurple),
                                                   SizedBox(width: 8),
-                                                  Text('Update Mobile Number'),
+                                                  Text('Verify Identity & Update Mobile'),
                                                 ],
                                               ),
                                             ),

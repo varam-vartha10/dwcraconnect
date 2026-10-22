@@ -1,6 +1,20 @@
+const bcrypt = require("bcryptjs");
+const crypto = require("crypto");
 const User = require("../models/User");
 const Group = require("../models/Group");
+const Otp = require("../models/Otp");
 const RegistrationRequest = require("../models/RegistrationRequest");
+const AuditLog = require("../models/AuditLog");
+const { sendOtp } = require("../services/smsService");
+
+function hashOtp(otp) {
+  return crypto.createHash("sha256").update(String(otp)).digest("hex");
+}
+
+function maskPhone(phone) {
+  if (!phone || phone.length < 4) return "Not Set";
+  return `+91 XXXXX ${phone.slice(-4)}`;
+}
 
 /**
  * 1. Get Leader Group Roster with Registration Statuses
@@ -37,6 +51,7 @@ const getGroupRoster = async (req, res) => {
       userId: u.userId,
       name: u.name,
       phoneNumber: u.phoneNumber || "Not Set",
+      phoneNumberMasked: maskPhone(u.phoneNumber),
       village: u.village || "N/A",
       role: u.role,
       position: u.position,
@@ -73,7 +88,7 @@ const addRosterMember = async (req, res) => {
   try {
     const { groupId } = req.params;
     const { name, phoneNumber, memberId, village, position } = req.body;
-    const { role, position: leaderPos, groupId: userGroupId } = req.user;
+    const { role, position: leaderPos, groupId: userGroupId, userId: leaderUserId } = req.user;
 
     const isLeader = role === "leader" || ["president", "secretary"].includes(leaderPos);
     if (!isLeader) {
@@ -114,7 +129,7 @@ const addRosterMember = async (req, res) => {
       if (existingUser) {
         return res.status(409).json({
           success: false,
-          message: `Phone number '${cleanPhone}' is already assigned to member ${existingUser.userId} (${existingUser.name}).`,
+          message: `Phone number '${maskPhone(cleanPhone)}' is already assigned to member ${existingUser.userId} (${existingUser.name}).`,
         });
       }
     }
@@ -146,13 +161,24 @@ const addRosterMember = async (req, res) => {
       isActive: true,
     });
 
+    // Audit Log Entry
+    await AuditLog.create({
+      memberId: assignedUserId,
+      groupId,
+      actingLeaderId: leaderUserId,
+      action: "LEADER_PRE_REGISTERED_MEMBER",
+      phoneNumberMasked: cleanPhone ? maskPhone(cleanPhone) : "N/A",
+      details: `Pre-registered member ${newUser.name} into group ${groupId}`,
+      physicalRegisterChecked: true,
+    });
+
     return res.status(201).json({
       success: true,
       message: `Member ${newUser.name} added to roster successfully. Assigned Member ID: ${newUser.userId}.`,
       member: {
         userId: newUser.userId,
         name: newUser.name,
-        phoneNumber: newUser.phoneNumber,
+        phoneNumberMasked: maskPhone(newUser.phoneNumber),
         groupId: newUser.groupId,
         village: newUser.village,
         status: "Not Registered",
@@ -168,27 +194,34 @@ const addRosterMember = async (req, res) => {
 };
 
 /**
- * 3. Leader-Assisted Update of Registered Mobile Number
+ * 3. Leader-Assisted Identity Verification & Mobile Number Update
  * Protected - Leader Only
  */
-const updateMemberMobile = async (req, res) => {
+const verifyMemberIdentityAndMobile = async (req, res) => {
   try {
     const { groupId, userId } = req.params;
-    const { newPhoneNumber } = req.body;
+    const { newPhoneNumber, physicalRegisterChecked } = req.body;
     const { role, position, groupId: userGroupId, userId: leaderUserId } = req.user;
 
     const isLeader = role === "leader" || ["president", "secretary"].includes(position);
     if (!isLeader) {
       return res.status(403).json({
         success: false,
-        message: "Forbidden: Only authorized group leaders can update member mobile numbers.",
+        message: "Forbidden: Only authorized group leaders can verify member identities.",
       });
     }
 
     if (groupId !== userGroupId) {
       return res.status(403).json({
         success: false,
-        message: "Forbidden: Cannot update mobile numbers for another group.",
+        message: "Forbidden: Cannot verify members from another group.",
+      });
+    }
+
+    if (!physicalRegisterChecked) {
+      return res.status(400).json({
+        success: false,
+        message: "Leader confirmation required: You must confirm checking the member's identity against the physical SHG register.",
       });
     }
 
@@ -205,7 +238,7 @@ const updateMemberMobile = async (req, res) => {
     if (existingUser) {
       return res.status(409).json({
         success: false,
-        message: `Mobile number ${cleanPhone} is already registered to another member (${existingUser.name}).`,
+        message: `Mobile number '${maskPhone(cleanPhone)}' is already registered to member ${existingUser.userId} (${existingUser.name}). Requires authorized resolution.`,
       });
     }
 
@@ -218,38 +251,151 @@ const updateMemberMobile = async (req, res) => {
     }
 
     user.phoneNumber = cleanPhone;
-    user.mobileVerified = false; // Reset verification for new phone
+    user.mobileVerified = false; // Reset verification so member MUST enter OTP herself
     await user.save();
 
-    console.log(`[Audit Trail] Leader ${leaderUserId} updated mobile number for member ${userId} (${user.name}) to ${cleanPhone} at ${new Date().toISOString()}`);
+    // Create Audit Log
+    await AuditLog.create({
+      memberId: userId,
+      groupId,
+      actingLeaderId: leaderUserId,
+      action: "LEADER_VERIFIED_MEMBER_MOBILE_UPDATE",
+      phoneNumberMasked: maskPhone(cleanPhone),
+      details: `Leader ${leaderUserId} verified physical SHG register and updated mobile number for ${user.name} (${userId})`,
+      physicalRegisterChecked: true,
+    });
+
+    // Send Real OTP to newly submitted mobile number
+    const rawOtp = String(Math.floor(100000 + Math.random() * 900000));
+    const otpHash = hashOtp(rawOtp);
+    const expiresAt = new Date(Date.now() + 5 * 60 * 1000);
+
+    await Otp.deleteMany({ phoneNumber: cleanPhone });
+    await Otp.create({
+      phoneNumber: cleanPhone,
+      otpHash,
+      attempts: 0,
+      expiresAt,
+    });
+
+    // Save/Update Registration Request for member self-activation
+    const activationId = `ACT-${Date.now()}-${Math.floor(1000 + Math.random() * 9000)}`;
+    await RegistrationRequest.deleteMany({ phoneNumber: cleanPhone });
+    await RegistrationRequest.create({
+      registrationId: activationId,
+      fullName: user.name,
+      phoneNumber: cleanPhone,
+      village: user.village || "N/A",
+      mandal: "N/A",
+      district: "N/A",
+      groupId: user.groupId,
+      assignedMemberId: user.userId,
+      status: "pending_otp",
+    });
+
+    const smsResult = await sendOtp(cleanPhone, rawOtp);
 
     return res.status(200).json({
       success: true,
-      message: `Mobile number for ${user.name} (${userId}) updated to +91 ${cleanPhone}. The member can now perform self-service OTP verification.`,
-      member: {
-        userId: user.userId,
-        name: user.name,
-        phoneNumber: user.phoneNumber,
-      },
+      activationId,
+      message: `Member identity verified for ${user.name} (${userId}). OTP sent to ${maskPhone(cleanPhone)}. The member can now enter her OTP and create her password.`,
+      smsGatewayStatus: smsResult.provider,
     });
   } catch (error) {
-    console.error("Update member mobile error:", error);
+    console.error("Verify member identity error:", error);
     return res.status(500).json({
       success: false,
-      message: "Failed to update member mobile number.",
+      message: "Failed to verify member identity.",
     });
   }
 };
 
 /**
- * 4. Bulk CSV/JSON Import Roster Members
+ * 4. Supervised Alternative In-Person Member Activation (Feature phones / No SMS)
+ * Protected - Leader Only
+ */
+const supervisedInPersonActivation = async (req, res) => {
+  try {
+    const { groupId, userId } = req.params;
+    const { password, confirmPassword, physicalRegisterChecked } = req.body;
+    const { role, position, groupId: userGroupId, userId: leaderUserId } = req.user;
+
+    const isLeader = role === "leader" || ["president", "secretary"].includes(position);
+    if (!isLeader) {
+      return res.status(403).json({
+        success: false,
+        message: "Forbidden: Only authorized group leaders can perform supervised activations.",
+      });
+    }
+
+    if (groupId !== userGroupId) {
+      return res.status(403).json({
+        success: false,
+        message: "Forbidden: Cannot perform supervised activation for another group.",
+      });
+    }
+
+    if (!physicalRegisterChecked) {
+      return res.status(400).json({
+        success: false,
+        message: "Leader confirmation required: You must confirm checking member's identity against physical SHG register.",
+      });
+    }
+
+    if (!password || password !== confirmPassword || String(password).length < 6) {
+      return res.status(400).json({
+        success: false,
+        message: "Member's chosen password must be at least 6 characters long and match confirmation.",
+      });
+    }
+
+    const user = await User.findOne({ userId, groupId });
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: "Member not found in this group.",
+      });
+    }
+
+    // Hash member's password using bcrypt salt rounds 12
+    const salt = await bcrypt.genSalt(12);
+    user.password = await bcrypt.hash(password, salt);
+    user.isActive = true;
+    await user.save();
+
+    // Audit Log Entry
+    await AuditLog.create({
+      memberId: userId,
+      groupId,
+      actingLeaderId: leaderUserId,
+      action: "LEADER_SUPERVISED_IN_PERSON_ACTIVATION",
+      phoneNumberMasked: maskPhone(user.phoneNumber),
+      details: `Supervised in-person activation completed for ${user.name} (${userId}) by Leader ${leaderUserId}`,
+      physicalRegisterChecked: true,
+    });
+
+    return res.status(200).json({
+      success: true,
+      message: `Supervised in-person activation completed for ${user.name} (${userId}). Account is now active.`,
+    });
+  } catch (error) {
+    console.error("Supervised activation error:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Failed to perform supervised in-person activation.",
+    });
+  }
+};
+
+/**
+ * 5. Bulk CSV/JSON Import Roster Members
  * Protected - Leader Only
  */
 const bulkImportRoster = async (req, res) => {
   try {
     const { groupId } = req.params;
-    const { members } = req.body; // Array of { name, phoneNumber, village }
-    const { role, position, groupId: userGroupId } = req.user;
+    const { members } = req.body;
+    const { role, position, groupId: userGroupId, userId: leaderUserId } = req.user;
 
     const isLeader = role === "leader" || ["president", "secretary"].includes(position);
     if (!isLeader) {
@@ -293,7 +439,7 @@ const bulkImportRoster = async (req, res) => {
       const cleanPhone = item.phoneNumber ? String(item.phoneNumber).trim().replace(/\D/g, "") : null;
       if (cleanPhone && cleanPhone.length === 10) {
         const exists = await User.findOne({ phoneNumber: cleanPhone });
-        if (exists) continue; // Skip duplicates
+        if (exists) continue;
       }
 
       const totalUsers = await User.countDocuments();
@@ -312,8 +458,18 @@ const bulkImportRoster = async (req, res) => {
       });
 
       addedCount++;
-      addedMembers.push({ userId: newUser.userId, name: newUser.name, phoneNumber: newUser.phoneNumber });
+      addedMembers.push({ userId: newUser.userId, name: newUser.name, phoneNumberMasked: maskPhone(newUser.phoneNumber) });
     }
+
+    // Audit Log Entry
+    await AuditLog.create({
+      memberId: `BULK-${addedCount}`,
+      groupId,
+      actingLeaderId: leaderUserId,
+      action: "LEADER_BULK_ROSTER_IMPORT",
+      details: `Bulk imported ${addedCount} member(s) into group ${groupId}`,
+      physicalRegisterChecked: true,
+    });
 
     return res.status(200).json({
       success: true,
@@ -333,6 +489,7 @@ const bulkImportRoster = async (req, res) => {
 module.exports = {
   getGroupRoster,
   addRosterMember,
-  updateMemberMobile,
+  verifyMemberIdentityAndMobile,
+  supervisedInPersonActivation,
   bulkImportRoster,
 };

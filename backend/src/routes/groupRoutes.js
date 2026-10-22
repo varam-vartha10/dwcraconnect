@@ -10,7 +10,8 @@ const {
 const {
   getGroupRoster,
   addRosterMember,
-  updateMemberMobile,
+  verifyMemberIdentityAndMobile,
+  supervisedInPersonActivation,
   bulkImportRoster,
 } = require("../controllers/leaderRosterController");
 
@@ -23,10 +24,11 @@ router.post("/", createGroup);
 router.get("/:groupId/pending-registrations", protect, getPendingRegistrations);
 router.post("/:groupId/approve-registration", protect, approveRegistration);
 
-// Leader Member Roster Management Routes
+// Leader Member Roster & Assisted Identity Verification Routes
 router.get("/:groupId/roster", protect, getGroupRoster);
 router.post("/:groupId/roster", protect, addRosterMember);
 router.post("/:groupId/roster/bulk", protect, bulkImportRoster);
-router.patch("/:groupId/roster/:userId/mobile", protect, updateMemberMobile);
+router.post("/:groupId/members/:userId/verify-identity", protect, verifyMemberIdentityAndMobile);
+router.post("/:groupId/members/:userId/supervised-activation", protect, supervisedInPersonActivation);
 
 module.exports = router;
