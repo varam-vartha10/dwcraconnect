@@ -1,6 +1,6 @@
 # DWCRA Connect
 
-> **Empowering Rural Women's Self-Help Groups (SHGs) through Digital Financial Inclusion, Transparent Accounting, Multilingual Voice-Assisted AI, and Offline-Resilient Technology.**
+> **Empowering Rural Women's Self-Help Groups (SHGs) through Digital Financial Inclusion, Transparent Accounting, Multilingual AI Companion, and Offline-Resilient Technology.**
 
 [![Production API Health](https://img.shields.io/badge/API--Health-200%20OK%20Live-brightgreen)](https://dwcra-connect-backend.onrender.com/api/health)
 [![Flutter Build](https://img.shields.io/badge/Flutter-3.12%2B-blue)](https://flutter.dev)
@@ -30,8 +30,8 @@ Development of Women and Children in Rural Areas (**DWCRA**) and Self-Help Group
 - **Double-Payment Protection**: Server-side checks block duplicate payment attempts on already-paid EMIs (`HTTP 400`).
 - **Paginated Transaction Statements**: Real-time statement history (`GET /api/transactions?page=1&limit=20`) enriched with EMI installment numbers and payment timestamps.
 
-### 2. 🤖 Unified Multilingual AI & Voice Assistant
-- **Dual Text & Voice Interface**: One shared AI assistant engine for both typed text and hands-free voice interaction.
+### 2. 🤖 Unified Multilingual AI Assistant
+- **Text Chat Interface**: Dedicated AI assistant companion for typed questions and instant answers.
 - **Multilingual Support**: Supports queries in **English**, **Telugu (తెలుగు)**, and **Tenglish** (Telugu written in Roman script e.g., *"Naa loan entha undi?"*, *"Naa next EMI eppudu?"*).
 - **Deterministic Database Grounding**: Personal financial answers are queried directly from MongoDB Atlas—eliminating AI financial hallucinations.
 - **Contextually Relevant Follow-up Chips**: Displays 2–4 clickable action chips under assistant responses for fluid multi-turn conversation.
@@ -59,7 +59,7 @@ Development of Women and Children in Rural Areas (**DWCRA**) and Self-Help Group
 ```
 +-----------------------------------------------------------------------+
 |                         FLUTTER MOBILE CLIENT                         |
-|  [ Dashboard | Loans | EMIs | Transactions | Chat/Voice | Offline Cache ] |
+|  [ Dashboard | Loans | EMIs | Transactions | Chat | Offline Cache ]   |
 +-----------------------------------+-----------------------------------+
                                     |
                             HTTPS REST / JSON
@@ -173,7 +173,6 @@ To build a standalone, optimized Android Release APK:
 
 ### Current Limitations
 1. **In-App Payment Realism**: EMI payments execute as authenticated database-confirmed transactions. Real-money bank/UPI transfers via gateways (e.g. Razorpay/UPI APIs) are not integrated.
-2. **Speech Recognition**: Speech-to-Text accuracy depends on device-native speech engines and background noise levels.
 
 ### Future Scope
 - Integration with NPCI / UPI payment gateway sandbox APIs.

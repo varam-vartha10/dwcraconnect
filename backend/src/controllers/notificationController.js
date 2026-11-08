@@ -1,4 +1,5 @@
 const Notification = require("../models/Notification");
+const User = require("../models/User");
 const {
   getMemberNotifications,
   syncMemberNotifications,
@@ -39,6 +40,34 @@ const syncNotifications = async (req, res) => {
   } catch (error) {
     console.error("Sync notifications error:", error.message);
     res.status(500).json({ success: false, message: "Failed to sync notifications" });
+  }
+};
+
+const registerDeviceToken = async (req, res) => {
+  try {
+    const { deviceToken, fcmToken } = req.body;
+    const { userId } = req.user;
+
+    const tokenToSave = deviceToken || fcmToken;
+    if (!tokenToSave) {
+      return res.status(400).json({
+        success: false,
+        message: "deviceToken is required",
+      });
+    }
+
+    await User.updateOne(
+      { userId },
+      { $set: { deviceToken: tokenToSave, fcmToken: tokenToSave } }
+    );
+
+    return res.status(200).json({
+      success: true,
+      message: "Device push token registered successfully",
+    });
+  } catch (error) {
+    console.error("Register device token error:", error.message);
+    res.status(500).json({ success: false, message: "Failed to register device token" });
   }
 };
 
@@ -111,7 +140,7 @@ const createNotification = async (req, res) => {
 
 const markAsRead = async (req, res) => {
   try {
-    const { id } = req.params; // notificationId
+    const { id } = req.params;
     const { userId } = req.user;
 
     await Notification.updateOne(
@@ -132,6 +161,7 @@ const markAsRead = async (req, res) => {
 module.exports = {
   getNotifications,
   syncNotifications,
+  registerDeviceToken,
   createNotification,
   markAsRead,
 };
